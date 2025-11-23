@@ -1,0 +1,149 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Xinyi District",
+                "walkability": 85,
+                "population": 225000,
+                "green_space": 30
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            121.560,
+                            25.030
+                        ],
+                        [
+                            121.580,
+                            25.030
+                        ],
+                        [
+                            121.580,
+                            25.050
+                        ],
+                        [
+                            121.560,
+                            25.050
+                        ],
+                        [
+                            121.560,
+                            25.030
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Da'an District",
+                "walkability": 90,
+                "population": 300000,
+                "green_space": 25
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            121.540,
+                            25.020
+                        ],
+                        [
+                            121.560,
+                            25.020
+                        ],
+                        [
+                            121.560,
+                            25.045
+                        ],
+                        [
+                            121.540,
+                            25.045
+                        ],
+                        [
+                            121.540,
+                            25.020
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Songshan District",
+                "walkability": 75,
+                "population": 200000,
+                "green_space": 15
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            121.545,
+                            25.050
+                        ],
+                        [
+                            121.575,
+                            25.050
+                        ],
+                        [
+                            121.575,
+                            25.070
+                        ],
+                        [
+                            121.545,
+                            25.070
+                        ],
+                        [
+                            121.545,
+                            25.050
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Zhongzheng District",
+                "walkability": 88,
+                "population": 150000,
+                "green_space": 20
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            121.510,
+                            25.020
+                        ],
+                        [
+                            121.540,
+                            25.020
+                        ],
+                        [
+                            121.540,
+                            25.045
+                        ],
+                        [
+                            121.510,
+                            25.045
+                        ],
+                        [
+                            121.510,
+                            25.020
+                        ]
+                    ]
+                ]
+            }
+        }
+    ]
+}
