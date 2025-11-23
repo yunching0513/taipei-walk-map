@@ -35,6 +35,25 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     layout: { visibility: visibleLayers.districts ? 'visible' : 'none' },
                     paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.3 }
                 });
+
+                // Add district name labels
+                map.current.addLayer({
+                    id: 'districts-labels',
+                    type: 'symbol',
+                    source: 'districts',
+                    layout: {
+                        'text-field': ['get', 'TOWNNAME'],
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 10,
+                        'text-anchor': 'center',
+                        visibility: visibleLayers.districts ? 'visible' : 'none'
+                    },
+                    paint: {
+                        'text-color': '#fff',
+                        'text-halo-color': '#000',
+                        'text-halo-width': 1.5
+                    }
+                });
             }
 
             // --- 1b. Villages (Polygon) ---
@@ -162,6 +181,32 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 map.current.on('mouseleave', 'trees-layer', () => {
                     map.current.getCanvas().style.cursor = '';
                 });
+
+                // Click event for Villages
+                map.current.on('click', 'villages-line', (e) => {
+                    if (e.features.length > 0) {
+                        const props = e.features[0].properties;
+                        const htmlContent = `
+                            <div style="font-family: 'Noto Sans TC', sans-serif; font-size: 12px; line-height: 1.5; color: #333;">
+                                <strong style="color: #3498db; font-size: 14px;">里界 (Village)</strong><br/>
+                                <strong>里名:</strong> ${props.VNAME || 'N/A'}<br/>
+                                <strong>行政區:</strong> ${props.TNAME || 'N/A'}<br/>
+                            </div>
+                        `;
+                        new maplibregl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(htmlContent)
+                            .addTo(map.current);
+                    }
+                });
+
+                // Change cursor on hover (Villages)
+                map.current.on('mouseenter', 'villages-line', () => {
+                    map.current.getCanvas().style.cursor = 'pointer';
+                });
+                map.current.on('mouseleave', 'villages-line', () => {
+                    map.current.getCanvas().style.cursor = '';
+                });
             }
 
             // --- 5. MRT Lines (Line) ---
@@ -262,6 +307,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
 
         setVisibility('grid-fill', visibleLayers.grid);
         setVisibility('districts-line', visibleLayers.districts);
+        setVisibility('districts-labels', visibleLayers.districts); // Update district labels visibility
         setVisibility('villages-line', visibleLayers.villages); // Add villages visibility
         setVisibility('mrt-lines-layer', visibleLayers.mrtLines);
         setVisibility('mrt-stations-layer', visibleLayers.mrtStations);

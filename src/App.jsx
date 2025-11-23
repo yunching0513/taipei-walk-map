@@ -36,8 +36,8 @@ function App() {
   // 圖層樣式 (顏色和透明度)
   const [layerStyles, setLayerStyles] = useState({
     grid: { opacity: 0.8 },
-    districts: { color: '#ffffff', opacity: 0.3 },
-    villages: { color: '#cccccc', opacity: 0.2 }, // Add villages style
+    districts: { color: '#ffffff', opacity: 0.5 },
+    villages: { color: '#cccccc', opacity: 0.4 }, // Add villages style
     mrtLines: { opacity: 1 },
     mrtStations: { color: '#e74c3c', opacity: 1.0 },
     busStops: { color: '#f39c12', opacity: 0.8 },
@@ -133,6 +133,7 @@ function App() {
   // 搜尋功能
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async (e) => {
@@ -187,18 +188,37 @@ function App() {
       details: '50% 實體人行道, 30% 樹蔭, 20% 交通'
     },
     {
-      id: 'urbanist',
-      label: '城市規劃 (Urbanist)',
-      desc: '綜合考量交通與步行品質',
-      details: '40% 交通, 40% 人行道品質, 20% 樹蔭'
-    },
-    {
       id: 'pedestrian',
       label: '純粹步行 (Pedestrian)',
       desc: '僅考量人行道覆蓋率與品質',
       details: '100% 人行道品質 (實體 + 標線)'
     }
   ];
+
+  const handleGeolocation = () => {
+    if (!navigator.geolocation) {
+      alert('您的瀏覽器不支援地理定位功能');
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setSearchLocation({
+          lat: latitude,
+          lon: longitude,
+          name: '您的位置'
+        });
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('定位失敗:', error);
+        alert('無法取得您的位置，請確認已允許瀏覽器存取位置資訊');
+        setIsLocating(false);
+      }
+    );
+  };
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', position: 'relative' }}>
@@ -241,15 +261,135 @@ function App() {
         className={isSidebarOpen ? 'sidebar sidebar-open' : 'sidebar sidebar-closed'}
       >
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Taipei Walk Map</h1>
-          <p style={{ color: '#888', fontSize: '14px' }}>Exploring urban accessibility.</p>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: "'Noto Sans TC', sans-serif" }}>
+            Taipei Walk Map
+          </h1>
+          <p style={{ color: '#888', fontSize: '14px', fontWeight: '200', fontFamily: "'Noto Sans TC', sans-serif", marginTop: '4px' }}>
+            Exploring urban accessibility.
+          </p>
+          <p style={{ color: '#666', fontSize: '18px', fontWeight: '200', fontFamily: "'Noto Sans TC', sans-serif", marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Created by Yun-Ching Wu（吳昀慶）</span>
+            <a
+              href="https://www.linkedin.com/in/yunching0513/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '22px',
+                height: '22px',
+                background: '#000',
+                borderRadius: '50%',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                textDecoration: 'none',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#000'}
+              title="LinkedIn Profile"
+            >
+              in
+            </a>
+          </p>
         </div>
 
+        {/* Search Location */}
+        <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜尋地點 (Search Location)"
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: '4px',
+                border: '1px solid #444',
+                background: '#2a2a2a',
+                color: '#fff',
+                fontSize: '14px'
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleGeolocation}
+              disabled={isLocating}
+              style={{
+                padding: '10px 12px',
+                borderRadius: '4px',
+                border: '1px solid #444',
+                background: isLocating ? '#555' : '#2a2a2a',
+                color: '#fff',
+                cursor: isLocating ? 'wait' : 'pointer',
+                fontSize: '18px',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => !isLocating && (e.currentTarget.style.background = '#3a3a3a')}
+              onMouseLeave={(e) => !isLocating && (e.currentTarget.style.background = '#2a2a2a')}
+              title="定位我的位置"
+            >
+              {isLocating ? '⏳' : '📍'}
+            </button>
+          </div>
+          {searchLocation && (
+            <div style={{ marginTop: '5px', fontSize: '12px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              📍 {searchLocation.name}
+              <button
+                type="button"
+                onClick={() => setSearchLocation(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#e74c3c',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  padding: '2px 5px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </form>
+
         {/* 評分模式選擇 */}
-        <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
+        <div style={{ background: '#2a2a2a', padding: '15px', borderRadius: '8px' }}>
+          <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#f1c40f' }}>
             Scoring Mode
           </h2>
+
+          {/* Grid Visibility Toggle (Moved to top) */}
+          <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #444' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={visibleLayers.grid}
+                onChange={() => setVisibleLayers(prev => ({ ...prev, grid: !prev.grid }))}
+                style={{ marginRight: '8px' }}
+              />
+              <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ddd' }}>顯示步行分數網格 (Show Grid)</span>
+            </label>
+            {visibleLayers.grid && (
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#aaa' }}>
+                <span>Opacity:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={layerStyles.grid.opacity}
+                  onChange={(e) => setLayerStyles(prev => ({ ...prev, grid: { ...prev.grid, opacity: parseFloat(e.target.value) } }))}
+                  style={{ flex: 1 }}
+                />
+                <span>{layerStyles.grid.opacity.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {scoringModes.map(mode => (
               <label key={mode.id} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '8px', background: scoringMode === mode.id ? '#444' : 'transparent', borderRadius: '4px' }}>
@@ -273,34 +413,6 @@ function App() {
                 </div>
               </label>
             ))}
-          </div>
-
-          {/* Grid Visibility Toggle (Moved here) */}
-          <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #444' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={visibleLayers.grid}
-                onChange={() => setVisibleLayers(prev => ({ ...prev, grid: !prev.grid }))}
-                style={{ marginRight: '8px' }}
-              />
-              <span style={{ fontSize: '14px', color: '#ddd' }}>顯示步行分數網格 (Show Grid)</span>
-            </label>
-            {visibleLayers.grid && (
-              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#aaa' }}>
-                <span>Opacity:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={layerStyles.grid.opacity}
-                  onChange={(e) => setLayerStyles(prev => ({ ...prev, grid: { ...prev.grid, opacity: parseFloat(e.target.value) } }))}
-                  style={{ flex: 1 }}
-                />
-                <span>{layerStyles.grid.opacity.toFixed(1)}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -346,55 +458,6 @@ function App() {
             </p>
           )}
         </div>
-
-        {/* 搜尋區 */}
-        <form onSubmit={handleSearch} style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
-            Search Location
-          </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="輸入地址或地標..."
-              disabled={isSearching}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                background: '#1a1a1a',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: 'white',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              type="submit"
-              disabled={isSearching}
-              style={{
-                padding: '8px 16px',
-                background: isSearching ? '#555' : '#f1c40f',
-                border: 'none',
-                borderRadius: '4px',
-                color: '#1a1a1a',
-                fontWeight: 'bold',
-                cursor: isSearching ? 'not-allowed' : 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              {isSearching ? '搜尋中...' : '搜尋'}
-            </button>
-          </div>
-          {searchLocation && (
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#aaa' }}>
-              📍 {searchLocation.name}
-            </div>
-          )}
-        </form>
-
-        {/* 檔案上傳區 */}
-        <FileUpload onLayerAdd={handleLayerAdd} />
 
         {/* 上傳的圖層管理 */}
         {uploadedLayers.length > 0 && (
@@ -691,6 +754,75 @@ function App() {
           </DragDropContext>
         </div>
 
+        {/* 檔案上傳區 (Moved to bottom) */}
+        <FileUpload onLayerAdd={handleLayerAdd} />
+
+        {/* 上傳的圖層管理 (Moved to bottom) */}
+        {uploadedLayers.length > 0 && (
+          <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
+            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
+              Uploaded Layers ({uploadedLayers.length})
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {uploadedLayers.map(layer => (
+                <div key={layer.id} style={{ padding: '10px', background: '#1a1a1a', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={layer.visible}
+                        onChange={() => handleLayerToggle(layer.id)}
+                        style={{ marginRight: '8px' }}
+                      />
+                      <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{layer.name}</span>
+                    </label>
+                    <button
+                      onClick={() => handleLayerRemove(layer.id)}
+                      style={{
+                        background: '#e74c3c',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'white',
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: '11px'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                  {layer.visible && (
+                    <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>Color:</span>
+                        <input
+                          type="color"
+                          value={layer.color}
+                          onChange={(e) => handleLayerStyleUpdate(layer.id, 'color', e.target.value)}
+                          style={{ width: '40px', height: '24px', border: 'none', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>Opacity:</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={layer.opacity}
+                          onChange={(e) => handleLayerStyleUpdate(layer.id, 'opacity', parseFloat(e.target.value))}
+                          style={{ flex: 1 }}
+                        />
+                        <span>{layer.opacity.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
 
       </div>
 
@@ -719,7 +851,42 @@ function App() {
           onSelectFeature={setSelectedFeature}
         />
       </div>
-    </div >
+
+      {/* Feedback Button - Moved above scale */}
+      <a
+        href="mailto:jtl0513@gmail.com?subject=Taipei Walk Map 回饋&body=請在此分享您的建議或回饋："
+        style={{
+          position: 'fixed',
+          bottom: '225px',
+          right: '20px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: '#000',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '24px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          zIndex: 999
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.background = '#333';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.background = '#000';
+        }}
+        title="提供回饋 (Send Feedback)"
+      >
+        ✉️
+      </a>
+    </div>
   );
 }
 
