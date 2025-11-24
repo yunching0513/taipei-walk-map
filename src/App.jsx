@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import './mobile.css';
 import Map from './components/Map';
@@ -15,6 +15,10 @@ import sidewalksMarkedData from './data/taipei_sidewalks_marked.json';
 import sidewalksPhysicalData from './data/taipei_sidewalks_physical.json';
 import busStopsData from './data/taipei_bus_stops.json';
 import treesData from './data/taipei_trees.json';
+import mainPlanData from './data/taipei_main_plan.json'; // Import Main Plan
+import zoningColors from './data/zoning_colors.json'; // Import zoning colors
+import zoneCounts from './data/zone_counts.json'; // Import zone counts
+import zoneCategories from './data/zone_categories.json'; // Import zone categories
 // Blue and Green 生態水與綠
 import parksData from './data/taipei_parks.json';
 import agricultureData from './data/taipei_agriculture.json';
@@ -23,12 +27,15 @@ import natureProtectionData from './data/taipei_nature_protection.json';
 
 function App() {
   const [selectedFeature, setSelectedFeature] = useState(null);
+  const [selectedMainPlanZones, setSelectedMainPlanZones] = useState([]); // State for selected zones
+  const [expandedCategories, setExpandedCategories] = useState({}); // State for expanded categories
 
   // 圖層開關狀態
   const [visibleLayers, setVisibleLayers] = useState({
     grid: false,
     districts: true,
-    villages: false, // Add villages
+    villages: false,
+    mainPlan: false, // Add Main Plan
     mrtLines: false,
     mrtStations: false,
     busStops: false,
@@ -46,7 +53,8 @@ function App() {
   const [layerStyles, setLayerStyles] = useState({
     grid: { opacity: 0.8 },
     districts: { color: '#ffffff', opacity: 0.5 },
-    villages: { color: '#cccccc', opacity: 0.4 }, // Add villages style
+    villages: { color: '#cccccc', opacity: 0.4 },
+    mainPlan: { opacity: 0.6 }, // Add Main Plan style
     mrtLines: { opacity: 1 },
     mrtStations: { color: '#e74c3c', opacity: 1.0 },
     busStops: { color: '#f39c12', opacity: 0.8 },
@@ -65,7 +73,7 @@ function App() {
   const [transportLayers, setTransportLayers] = useState(['mrtStations', 'busStops', 'mrtLines']);
   const [blueGreenLayers, setBlueGreenLayers] = useState(['trees', 'parks', 'agriculture', 'birdProtection', 'natureProtection']);
   const [infrastructureLayers, setInfrastructureLayers] = useState(['sidewalksMarked', 'sidewalksPhysical', 'roads']);
-  const [adminLayers, setAdminLayers] = useState(['villages', 'districts']);
+  const [adminLayers, setAdminLayers] = useState(['villages', 'districts', 'mainPlan']); // Add mainPlan here
 
   // Combined layer order for Map (Transport > Blue&Green > Infra > Admin)
   const layerOrder = [...transportLayers, ...blueGreenLayers, ...infrastructureLayers, ...adminLayers];
@@ -73,23 +81,28 @@ function App() {
   // 圖層配置 (用於渲染列表)
   const layerConfig = {
     mrtStations: { label: '捷運站 (MRT Stations)', type: 'point' },
+    mrtLines: { label: '捷運路網 (MRT Lines)', type: 'line', noColor: true },
     busStops: { label: '公車站 (Bus Stops)', type: 'point' },
     trees: { label: '行道樹 (Trees)', type: 'point' },
     parks: { label: '公園 (Parks)', type: 'polygon' },
     agriculture: { label: '農業區 (Agriculture)', type: 'polygon' },
     birdProtection: { label: '野鳥保護區 (Bird Protection)', type: 'polygon' },
     natureProtection: { label: '自然保護區 (Nature Protection)', type: 'polygon' },
-    mrtLines: { label: '捷運路網 (MRT Lines)', type: 'line', noColor: true },
     roads: { label: '道路 (Roads)', type: 'polygon' },
     sidewalksMarked: { label: '標線型人行道 (Marked Sidewalks)', type: 'polygon' },
     sidewalksPhysical: { label: '實體人行道 (Physical Sidewalks)', type: 'polygon' },
     grid: { label: '步行分數網格 (Walkability Grid)', type: 'polygon', noColor: true },
-    villages: { label: '里界 (Villages)', type: 'polygon' }, // Add villages config
-    districts: { label: '行政區界 (Districts)', type: 'polygon' }
+    villages: { label: '里界 (Villages)', type: 'polygon', hasLabelToggle: true },
+    districts: { label: '行政區界 (Districts)', type: 'polygon', hasLabelToggle: true },
+    mainPlan: { label: '主要計畫 (Main Plan)', type: 'polygon', noColor: true } // Add Main Plan config
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSelectionOpen, setIsSelectionOpen] = useState(true); // Selection panel state (default: open)
+
+  // Label visibility state
+  const [showDistrictLabels, setShowDistrictLabels] = useState(true);
+  const [showVillageLabels, setShowVillageLabels] = useState(true);
 
   const toggleLayer = (layer) => {
     setVisibleLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -266,6 +279,25 @@ function App() {
       }
     );
   };
+
+  // Memoize layers object to prevent unnecessary re-renders of Map component
+  const layers = useMemo(() => ({
+    grid: gridData,
+    districts: districtData,
+    villages: villagesData,
+    mainPlan: mainPlanData,
+    mrtLines: mrtLinesData,
+    mrtStations: mrtStationsData,
+    busStops: busStopsData,
+    trees: treesData,
+    parks: parksData,
+    agriculture: agricultureData,
+    birdProtection: birdProtectionData,
+    natureProtection: natureProtectionData,
+    roads: roadsData,
+    sidewalksMarked: sidewalksMarkedData,
+    sidewalksPhysical: sidewalksPhysicalData
+  }), []);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', position: 'relative' }}>
@@ -538,13 +570,13 @@ function App() {
           </h2>
           <DragDropContext onDragEnd={onDragEnd}>
 
-            {/* Public Transport Group */}
+            {/* Infrastructure Group */}
             <div style={{ marginBottom: '15px' }}>
-              <h3 style={{ fontSize: '12px', color: '#f1c40f', marginBottom: '8px', textTransform: 'uppercase' }}>公共運輸 (Public Transport)</h3>
-              <Droppable droppableId="transport">
+              <h3 style={{ fontSize: '12px', color: '#3498db', marginBottom: '8px', textTransform: 'uppercase' }}>基礎設施 (Infrastructure)</h3>
+              <Droppable droppableId="infrastructure">
                 {(provided) => (
                   <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {transportLayers.map((layerKey, index) => {
+                    {infrastructureLayers.map((layerKey, index) => {
                       const config = layerConfig[layerKey];
                       return (
                         <Draggable key={layerKey} draggableId={layerKey} index={index}>
@@ -574,6 +606,106 @@ function App() {
 
                               {visibleLayers[layerKey] && (
                                 <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                                  {/* Label Toggle */}
+                                  {config.hasLabelToggle && (
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '4px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={layerKey === 'districts' ? showDistrictLabels : showVillageLabels}
+                                        onChange={() => layerKey === 'districts' ? setShowDistrictLabels(!showDistrictLabels) : setShowVillageLabels(!showVillageLabels)}
+                                        style={{ marginRight: '6px' }}
+                                      />
+                                      <span>顯示名稱 (Show Name)</span>
+                                    </label>
+                                  )}
+
+                                  {!config.noColor && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span>Color:</span>
+                                      <input
+                                        type="color"
+                                        value={layerStyles[layerKey].color}
+                                        onChange={(e) => updateLayerStyle(layerKey, 'color', e.target.value)}
+                                        style={{ width: '40px', height: '24px', border: 'none', cursor: 'pointer' }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>Opacity:</span>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={layerStyles[layerKey].opacity}
+                                      onChange={(e) => updateLayerStyle(layerKey, 'opacity', parseFloat(e.target.value))}
+                                      style={{ flex: 1 }}
+                                    />
+                                    <span>{layerStyles[layerKey].opacity.toFixed(1)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+
+            {/* Public Transport Group */}
+            <div style={{ marginBottom: '15px' }}>
+              <h3 style={{ fontSize: '12px', color: '#f1c40f', marginBottom: '8px', textTransform: 'uppercase' }}>公共運輸 (Public Transport)</h3>
+              <Droppable droppableId="transport">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {transportLayers.map((layerKey, index) => {
+                      const config = layerConfig[layerKey];
+                      return (
+                        <Draggable key={layerKey} draggableId={layerKey} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                background: '#1a1a1a',
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid #444'
+                              }}
+                            >
+
+                              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
+                                <span style={{ marginRight: '8px', cursor: 'grab' }}>☰</span>
+                                <input
+                                  type="checkbox"
+                                  checked={visibleLayers[layerKey]}
+                                  onChange={() => toggleLayer(layerKey)}
+                                  style={{ marginRight: '8px' }}
+                                />
+                                <strong>{config.label}</strong>
+                              </label>
+
+                              {visibleLayers[layerKey] && (
+                                <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                                  {/* Label Toggle */}
+                                  {config.hasLabelToggle && (
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '4px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={layerKey === 'districts' ? showDistrictLabels : showVillageLabels}
+                                        onChange={() => layerKey === 'districts' ? setShowDistrictLabels(!showDistrictLabels) : setShowVillageLabels(!showVillageLabels)}
+                                        style={{ marginRight: '6px' }}
+                                      />
+                                      <span>顯示名稱 (Show Name)</span>
+                                    </label>
+                                  )}
+
                                   {!config.noColor && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <span>Color:</span>
@@ -647,6 +779,19 @@ function App() {
 
                               {visibleLayers[layerKey] && (
                                 <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                                  {/* Label Toggle */}
+                                  {config.hasLabelToggle && (
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '4px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={layerKey === 'districts' ? showDistrictLabels : showVillageLabels}
+                                        onChange={() => layerKey === 'districts' ? setShowDistrictLabels(!showDistrictLabels) : setShowVillageLabels(!showVillageLabels)}
+                                        style={{ marginRight: '6px' }}
+                                      />
+                                      <span>顯示名稱 (Show Name)</span>
+                                    </label>
+                                  )}
+
                                   {!config.noColor && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <span>Color:</span>
@@ -684,78 +829,7 @@ function App() {
               </Droppable>
             </div>
 
-            {/* Infrastructure Group */}
-            <div style={{ marginBottom: '15px' }}>
-              <h3 style={{ fontSize: '12px', color: '#3498db', marginBottom: '8px', textTransform: 'uppercase' }}>基礎設施 (Infrastructure)</h3>
-              <Droppable droppableId="infrastructure">
-                {(provided) => (
-                  <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {infrastructureLayers.map((layerKey, index) => {
-                      const config = layerConfig[layerKey];
-                      return (
-                        <Draggable key={layerKey} draggableId={layerKey} index={index}>
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={{
-                                ...provided.draggableProps.style,
-                                background: '#1a1a1a',
-                                padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
-                              }}
-                            >
-                              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
-                                <span style={{ marginRight: '8px', cursor: 'grab' }}>☰</span>
-                                <input
-                                  type="checkbox"
-                                  checked={visibleLayers[layerKey]}
-                                  onChange={() => toggleLayer(layerKey)}
-                                  style={{ marginRight: '8px' }}
-                                />
-                                <strong>{config.label}</strong>
-                              </label>
 
-                              {visibleLayers[layerKey] && (
-                                <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-                                  {!config.noColor && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <span>Color:</span>
-                                      <input
-                                        type="color"
-                                        value={layerStyles[layerKey].color}
-                                        onChange={(e) => updateLayerStyle(layerKey, 'color', e.target.value)}
-                                        style={{ width: '40px', height: '24px', border: 'none', cursor: 'pointer' }}
-                                      />
-                                    </div>
-                                  )}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>Opacity:</span>
-                                    <input
-                                      type="range"
-                                      min="0"
-                                      max="1"
-                                      step="0.1"
-                                      value={layerStyles[layerKey].opacity}
-                                      onChange={(e) => updateLayerStyle(layerKey, 'opacity', parseFloat(e.target.value))}
-                                      style={{ flex: 1 }}
-                                    />
-                                    <span>{layerStyles[layerKey].opacity.toFixed(1)}</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
 
             {/* Admin Group */}
             <div>
@@ -793,6 +867,158 @@ function App() {
 
                               {visibleLayers[layerKey] && (
                                 <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                                  {/* Label Toggle */}
+                                  {config.hasLabelToggle && (
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '4px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={layerKey === 'districts' ? showDistrictLabels : showVillageLabels}
+                                        onChange={() => layerKey === 'districts' ? setShowDistrictLabels(!showDistrictLabels) : setShowVillageLabels(!showVillageLabels)}
+                                        style={{ marginRight: '6px' }}
+                                      />
+                                      <span>顯示名稱 (Show Name)</span>
+                                    </label>
+                                  )}
+
+                                  {/* Zone Filter for Main Plan */}
+                                  {layerKey === 'mainPlan' && zoningColors && (
+                                    <div style={{ marginBottom: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                        <label style={{ fontSize: '11px', color: '#aaa' }}>
+                                          過濾分區 (Filter Zones) {selectedMainPlanZones.length > 0 && `(${selectedMainPlanZones.length})`}
+                                        </label>
+                                        {selectedMainPlanZones.length > 0 && (
+                                          <button
+                                            onClick={() => setSelectedMainPlanZones([])}
+                                            style={{
+                                              padding: '2px 6px',
+                                              background: '#555',
+                                              border: 'none',
+                                              borderRadius: '3px',
+                                              color: '#fff',
+                                              cursor: 'pointer',
+                                              fontSize: '9px'
+                                            }}
+                                          >
+                                            清除
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div style={{
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        background: '#2a2a2a',
+                                        border: '1px solid #555',
+                                        borderRadius: '4px',
+                                        padding: '6px'
+                                      }}>
+                                        {zoneCategories.categories.map((category) => {
+                                          const isExpanded = expandedCategories[category.category];
+                                          const categoryZones = category.zones.map(z => z.zone);
+                                          const selectedInCategory = categoryZones.filter(z => selectedMainPlanZones.includes(z)).length;
+
+                                          return (
+                                            <div key={category.category} style={{ marginBottom: '4px' }}>
+                                              {/* Category Header */}
+                                              <div
+                                                onClick={() => setExpandedCategories(prev => ({
+                                                  ...prev,
+                                                  [category.category]: !prev[category.category]
+                                                }))}
+                                                style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  padding: '6px 4px',
+                                                  background: '#3a3a3a',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer',
+                                                  marginBottom: isExpanded ? '4px' : '0'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = '#444'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = '#3a3a3a'}
+                                              >
+                                                <span style={{ marginRight: '6px', fontSize: '10px', color: '#aaa' }}>
+                                                  {isExpanded ? '▼' : '▶'}
+                                                </span>
+                                                <span
+                                                  style={{
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    backgroundColor: category.color,
+                                                    border: '1px solid #666',
+                                                    marginRight: '6px',
+                                                    flexShrink: 0
+                                                  }}
+                                                />
+                                                <span style={{ flex: 1, fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>
+                                                  {category.category}
+                                                </span>
+                                                <span style={{ fontSize: '9px', color: '#888', marginRight: '8px' }}>
+                                                  {selectedInCategory > 0 ? `${selectedInCategory}/` : ''}{category.zones.length}
+                                                </span>
+                                                <span style={{ fontSize: '9px', color: '#888' }}>
+                                                  ({category.total_count})
+                                                </span>
+                                              </div>
+
+                                              {/* Category Zones */}
+                                              {isExpanded && (
+                                                <div style={{ paddingLeft: '16px' }}>
+                                                  {category.zones.map(({ zone, count }) => {
+                                                    const isSelected = selectedMainPlanZones.includes(zone);
+                                                    const color = zoningColors[zone] || '#cccccc';
+                                                    return (
+                                                      <label
+                                                        key={zone}
+                                                        style={{
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          padding: '4px 2px',
+                                                          cursor: 'pointer',
+                                                          background: isSelected ? '#333' : 'transparent',
+                                                          borderRadius: '3px',
+                                                          marginBottom: '2px',
+                                                          fontSize: '10px'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = isSelected ? '#3a3a3a' : '#2d2d2d'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? '#333' : 'transparent'}
+                                                      >
+                                                        <input
+                                                          type="checkbox"
+                                                          checked={isSelected}
+                                                          onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                              setSelectedMainPlanZones([...selectedMainPlanZones, zone]);
+                                                            } else {
+                                                              setSelectedMainPlanZones(selectedMainPlanZones.filter(z => z !== zone));
+                                                            }
+                                                          }}
+                                                          style={{ marginRight: '6px', cursor: 'pointer' }}
+                                                        />
+                                                        <span
+                                                          style={{
+                                                            width: '10px',
+                                                            height: '10px',
+                                                            backgroundColor: color,
+                                                            border: '1px solid #666',
+                                                            marginRight: '6px',
+                                                            flexShrink: 0
+                                                          }}
+                                                        />
+                                                        <span style={{ flex: 1, color: '#ccc' }}>{zone}</span>
+                                                        <span style={{ color: '#777', fontSize: '9px', marginLeft: '4px' }}>({count})</span>
+                                                      </label>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {!config.noColor && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <span>Color:</span>
@@ -950,22 +1176,7 @@ function App() {
       {/* 右側地圖 */}
       <div style={{ flex: 1, position: 'relative' }}>
         <Map
-          layers={{
-            grid: gridData,
-            districts: districtData,
-            villages: villagesData, // Pass villages data
-            mrtLines: mrtLinesData,
-            mrtStations: mrtStationsData,
-            busStops: busStopsData,
-            trees: treesData,
-            parks: parksData,
-            agriculture: agricultureData,
-            birdProtection: birdProtectionData,
-            natureProtection: natureProtectionData,
-            roads: roadsData,
-            sidewalksMarked: sidewalksMarkedData,
-            sidewalksPhysical: sidewalksPhysicalData
-          }}
+          layers={layers}
           visibleLayers={visibleLayers}
           layerStyles={layerStyles}
           layerOrder={layerOrder}
@@ -975,7 +1186,16 @@ function App() {
           treesData={treesData}
           basemapUrl={basemaps[selectedBasemap].url}
           showMapLabels={showMapLabels}
-          onSelectFeature={setSelectedFeature}
+          showDistrictLabels={showDistrictLabels}
+          showVillageLabels={showVillageLabels}
+          setShowVillageLabels={setShowVillageLabels}
+          zoningColors={zoningColors} // Pass zoning colors
+          selectedMainPlanZones={selectedMainPlanZones} // Pass selected zones
+          setSelectedMainPlanZones={setSelectedMainPlanZones} // Pass setter
+          onSelectFeature={(feature) => {
+            setSelectedFeature(feature);
+            setIsSelectionOpen(true);
+          }}
           selectedFeature={selectedFeature}
         />
       </div>

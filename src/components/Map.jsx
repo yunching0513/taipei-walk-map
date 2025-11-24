@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-export default function Map({ layers, visibleLayers, layerStyles, layerOrder, scoringMode, searchLocation, uploadedLayers, treesData, basemapUrl, showMapLabels, onSelectFeature, selectedFeature }) {
+export default function Map({ layers, visibleLayers, layerStyles, layerOrder, scoringMode, searchLocation, uploadedLayers, treesData, basemapUrl, showMapLabels, showDistrictLabels, showVillageLabels, onSelectFeature, selectedFeature, zoningColors, selectedMainPlanZones }) {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const searchMarker = useRef(null);
@@ -27,6 +27,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         map.current.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-right');
 
         map.current.on('load', () => {
+            console.log('Map Loaded');
+            console.log('Map Glyphs:', map.current.getStyle().glyphs);
             setIsLoaded(true);
         });
     }, []);
@@ -48,25 +50,62 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
 
                 // Add district name labels
+                console.log('Adding district labels layer');
                 map.current.addLayer({
                     id: 'districts-labels',
                     type: 'symbol',
                     source: 'districts',
                     layout: {
-                        'text-field': ['get', 'TOWNNAME'],
-                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                        'text-size': 10,
+                        'text-field': ['get', 'TNAME'],
+                        'text-font': ['Open Sans Bold'],
+                        'text-size': 12,
                         'text-anchor': 'center',
-                        visibility: visibleLayers.districts ? 'visible' : 'none'
+                        'text-allow-overlap': true,
+                        visibility: (visibleLayers.districts && showDistrictLabels) ? 'visible' : 'none'
                     },
                     paint: {
                         'text-color': '#fff',
                         'text-halo-color': '#000',
-                        'text-halo-width': 1.5
+                        'text-halo-width': 2
                     }
                 });
             }
 
+            // --- 1c. Main Plan (Polygon) ---
+            if (layers.mainPlan && !map.current.getSource('main-plan')) {
+                map.current.addSource('main-plan', { type: 'geojson', data: layers.mainPlan });
+
+                // Build color match expression from zoningColors
+                const colorMatchExpression = ['match', ['get', 'zone_type']];
+                if (zoningColors) {
+                    Object.entries(zoningColors).forEach(([zone, color]) => {
+                        colorMatchExpression.push(zone, color);
+                    });
+                }
+                colorMatchExpression.push('#cccccc'); // Default color
+
+                console.log('Main Plan Color Expression:', colorMatchExpression.slice(0, 20)); // Log first 20 entries
+                console.log('Total zones with colors:', Object.keys(zoningColors || {}).length);
+
+                // Build filter expression based on selectedMainPlanZones
+                let filterExpression = null;
+                if (selectedMainPlanZones && selectedMainPlanZones.length > 0) {
+                    filterExpression = ['in', ['get', 'zone_type'], ['literal', selectedMainPlanZones]];
+                }
+
+                map.current.addLayer({
+                    id: 'main-plan-fill',
+                    type: 'fill',
+                    source: 'main-plan',
+                    layout: { visibility: visibleLayers.mainPlan ? 'visible' : 'none' },
+                    ...(filterExpression ? { filter: filterExpression } : {}),
+                    paint: {
+                        'fill-color': colorMatchExpression,
+                        'fill-opacity': layerStyles.mainPlan ? layerStyles.mainPlan.opacity : 0.6,
+                        'fill-outline-color': '#000000'
+                    }
+                });
+            }
             // --- 1b. Villages (Polygon) ---
             if (layers.villages && !map.current.getSource('villages')) {
                 map.current.addSource('villages', { type: 'geojson', data: layers.villages });
@@ -76,6 +115,26 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     source: 'villages',
                     layout: { visibility: visibleLayers.villages ? 'visible' : 'none' },
                     paint: { 'line-color': '#cccccc', 'line-width': 1, 'line-opacity': 0.2 }
+                });
+
+                // Add village name labels
+                map.current.addLayer({
+                    id: 'villages-labels',
+                    type: 'symbol',
+                    source: 'villages',
+                    layout: {
+                        'text-field': ['get', 'VNAME'],
+                        'text-font': ['Open Sans Regular'],
+                        'text-size': 10,
+                        'text-anchor': 'center',
+                        'text-allow-overlap': false,
+                        visibility: (visibleLayers.villages && showVillageLabels) ? 'visible' : 'none'
+                    },
+                    paint: {
+                        'text-color': '#eee',
+                        'text-halo-color': '#333',
+                        'text-halo-width': 1
+                    }
                 });
             }
 
@@ -218,13 +277,13 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     paint: {
                         'line-color': [
                             'match', ['get', 'RouteName'],
-                            '淡水信義線', '#e74c3c',
-                            '板南線', '#3498db',
-                            '文湖線', '#9b59b6',
-                            '松山新店線', '#2ecc71',
-                            '中和新蘆線', '#f1c40f',
-                            '環狀線', '#f39c12',
-                            '#95a5a6'
+                            ['淡水線', '信義線', '新北投支線'], '#e3002c', // Red (Tamsui-Xinyi)
+                            ['板橋線', '南港線', '土城線'], '#0070bd',     // Blue (Bannan)
+                            ['木柵線', '內湖線'], '#c48c31',               // Brown (Wenhu)
+                            ['新店線', '小南門線', '松山線', '碧潭支線'], '#008659', // Green (Songshan-Xindian)
+                            ['中和線', '新莊線', '蘆洲線'], '#f8b61c',     // Orange (Zhonghe-Xinlu)
+                            ['環狀線'], '#ffdb00',                         // Yellow (Circular)
+                            '#95a5a6'                                     // Default Gray
                         ],
                         'line-width': 3
                     }
@@ -418,11 +477,61 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
             }
 
+            // Main Plan listeners (if not bound)
+            if (layers.mainPlan && !listenersBound.current) {
+                // Click event for Main Plan
+                map.current.on('click', 'main-plan-fill', (e) => {
+                    if (e.features.length > 0) {
+                        const props = e.features[0].properties;
+                        const zoneType = props.zone_type || 'N/A';
+                        const color = zoningColors[zoneType] || '#cccccc';
+
+                        const htmlContent = `
+                            <div style="font-family: 'Noto Sans TC', sans-serif; font-size: 12px; line-height: 1.5; color: #333;">
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 16px; height: 16px; background-color: ${color}; border: 1px solid #666; margin-right: 8px;"></div>
+                                    <strong style="color: #2c3e50; font-size: 14px;">主要計畫分區</strong>
+                                </div>
+                                <strong>分區類型:</strong> ${zoneType}<br/>
+                                ${props.使用分區 ? `<strong>原始分區:</strong> ${props.使用分區}<br/>` : ''}
+                                ${props.分區說明 ? `<strong>說明:</strong> ${props.分區說明}<br/>` : ''}
+                            </div>
+                        `;
+
+                        new maplibregl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(htmlContent)
+                            .addTo(map.current);
+                    }
+                });
+
+                // Change cursor on hover (Main Plan)
+                map.current.on('mouseenter', 'main-plan-fill', () => {
+                    map.current.getCanvas().style.cursor = 'pointer';
+                });
+                map.current.on('mouseleave', 'main-plan-fill', () => {
+                    map.current.getCanvas().style.cursor = '';
+                });
+            }
+
             listenersBound.current = true;
         };
 
         addLayers();
     }, [isLoaded, layers, visibleLayers, layerStyles, scoringMode]);
+
+    // Update Main Plan Filter
+    useEffect(() => {
+        if (!map.current || !isLoaded || !map.current.getLayer('main-plan-fill')) return;
+
+        let filterExpression = null;
+        if (selectedMainPlanZones && selectedMainPlanZones.length > 0) {
+            filterExpression = ['in', ['get', 'zone_type'], ['literal', selectedMainPlanZones]];
+        }
+
+        map.current.setFilter('main-plan-fill', filterExpression);
+        console.log('Updated Main Plan Filter:', filterExpression);
+    }, [selectedMainPlanZones, isLoaded]);
 
     // Update Visibility and Layer Order
     useEffect(() => {
@@ -436,8 +545,10 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
 
         setVisibility('grid-fill', visibleLayers.grid);
         setVisibility('districts-line', visibleLayers.districts);
-        setVisibility('districts-labels', visibleLayers.districts); // Update district labels visibility
-        setVisibility('villages-line', visibleLayers.villages); // Add villages visibility
+        setVisibility('districts-labels', visibleLayers.districts && showDistrictLabels); // Update district labels visibility
+        setVisibility('villages-line', visibleLayers.villages);
+        setVisibility('villages-labels', visibleLayers.villages && showVillageLabels); // Add villages labels visibility
+        setVisibility('main-plan-fill', visibleLayers.mainPlan); // Add Main Plan visibility
         setVisibility('mrt-lines-layer', visibleLayers.mrtLines);
         setVisibility('mrt-stations-layer', visibleLayers.mrtStations);
         setVisibility('bus-stops-layer', visibleLayers.busStops);
@@ -474,7 +585,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             'sidewalksPhysical': ['sidewalks-physical-fill'],
             'grid': ['grid-fill'],
             'villages': ['villages-line'], // Add villages to layer map
-            'districts': ['districts-line']
+            'districts': ['districts-line'],
+            'mainPlan': ['main-plan-fill']
         };
 
         // Reverse iterate to stack from bottom to top
@@ -497,7 +609,24 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         // But maplibregl doesn't have 'moveToBottom'. 
         // The strategy of moving everything else to top works best.
 
-    }, [visibleLayers, layerOrder, isLoaded]); // Add isLoaded dependency
+        // Update grid if moved to top
+        if (map.current.getLayer('grid-fill')) {
+            map.current.moveLayer('grid-fill', layerMap['districts'][0]);
+        }
+    }, [visibleLayers, layerOrder, isLoaded, showDistrictLabels, showVillageLabels]);
+
+    // Update Main Plan filter when selectedMainPlanZones changes
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        if (map.current.getLayer('main-plan-fill')) {
+            let filterExpression = null;
+            if (selectedMainPlanZones && selectedMainPlanZones.length > 0) {
+                filterExpression = ['in', ['get', 'zone_type'], ['literal', selectedMainPlanZones]];
+            }
+            map.current.setFilter('main-plan-fill', filterExpression);
+        }
+    }, [selectedMainPlanZones, isLoaded]);
 
     // Update Layer Styles (Color & Opacity)
     useEffect(() => {
@@ -518,6 +647,11 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         if (map.current.getLayer('villages-line')) {
             map.current.setPaintProperty('villages-line', 'line-color', layerStyles.villages.color);
             map.current.setPaintProperty('villages-line', 'line-opacity', layerStyles.villages.opacity);
+        }
+
+        // Main Plan
+        if (map.current.getLayer('main-plan-fill')) {
+            map.current.setPaintProperty('main-plan-fill', 'fill-opacity', layerStyles.mainPlan.opacity);
         }
 
         // MRT Lines (only opacity, color is data-driven based on RouteName)
