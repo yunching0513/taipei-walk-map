@@ -15,6 +15,11 @@ import sidewalksMarkedData from './data/taipei_sidewalks_marked.json';
 import sidewalksPhysicalData from './data/taipei_sidewalks_physical.json';
 import busStopsData from './data/taipei_bus_stops.json';
 import treesData from './data/taipei_trees.json';
+// Blue and Green 生態水與綠
+import parksData from './data/taipei_parks.json';
+import agricultureData from './data/taipei_agriculture.json';
+import birdProtectionData from './data/taipei_bird_protection.json';
+import natureProtectionData from './data/taipei_nature_protection.json';
 
 function App() {
   const [selectedFeature, setSelectedFeature] = useState(null);
@@ -28,6 +33,10 @@ function App() {
     mrtStations: false,
     busStops: false,
     trees: false,
+    parks: false,
+    agriculture: false,
+    birdProtection: false,
+    natureProtection: false,
     roads: false,
     sidewalksMarked: false,
     sidewalksPhysical: false
@@ -42,6 +51,10 @@ function App() {
     mrtStations: { color: '#e74c3c', opacity: 1.0 },
     busStops: { color: '#f39c12', opacity: 0.8 },
     trees: { color: '#27ae60', opacity: 0.8 },
+    parks: { color: '#4caf50', opacity: 0.6 },
+    agriculture: { color: '#9ccc65', opacity: 0.5 },
+    birdProtection: { color: '#26a69a', opacity: 0.6 },
+    natureProtection: { color: '#1b5e20', opacity: 0.7 },
     roads: { color: '#ffffff', opacity: 1.0 },
     sidewalksMarked: { color: '#2ecc71', opacity: 1.0 },
     sidewalksPhysical: { color: '#3498db', opacity: 0.5 }
@@ -50,17 +63,22 @@ function App() {
   // 圖層順序 (由上到下，對應地圖上的 z-index 由大到小)
   // Layer Groups State
   const [transportLayers, setTransportLayers] = useState(['mrtStations', 'busStops', 'mrtLines']);
-  const [infrastructureLayers, setInfrastructureLayers] = useState(['trees', 'sidewalksMarked', 'sidewalksPhysical', 'roads']);
+  const [blueGreenLayers, setBlueGreenLayers] = useState(['trees', 'parks', 'agriculture', 'birdProtection', 'natureProtection']);
+  const [infrastructureLayers, setInfrastructureLayers] = useState(['sidewalksMarked', 'sidewalksPhysical', 'roads']);
   const [adminLayers, setAdminLayers] = useState(['villages', 'districts']);
 
-  // Combined layer order for Map (Transport > Infra > Admin)
-  const layerOrder = [...transportLayers, ...infrastructureLayers, ...adminLayers];
+  // Combined layer order for Map (Transport > Blue&Green > Infra > Admin)
+  const layerOrder = [...transportLayers, ...blueGreenLayers, ...infrastructureLayers, ...adminLayers];
 
   // 圖層配置 (用於渲染列表)
   const layerConfig = {
     mrtStations: { label: '捷運站 (MRT Stations)', type: 'point' },
     busStops: { label: '公車站 (Bus Stops)', type: 'point' },
     trees: { label: '行道樹 (Trees)', type: 'point' },
+    parks: { label: '公園 (Parks)', type: 'polygon' },
+    agriculture: { label: '農業區 (Agriculture)', type: 'polygon' },
+    birdProtection: { label: '野鳥保護區 (Bird Protection)', type: 'polygon' },
+    natureProtection: { label: '自然保護區 (Nature Protection)', type: 'polygon' },
     mrtLines: { label: '捷運路網 (MRT Lines)', type: 'line', noColor: true },
     roads: { label: '道路 (Roads)', type: 'polygon' },
     sidewalksMarked: { label: '標線型人行道 (Marked Sidewalks)', type: 'polygon' },
@@ -71,6 +89,7 @@ function App() {
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSelectionOpen, setIsSelectionOpen] = useState(true); // Selection panel state (default: open)
 
   const toggleLayer = (layer) => {
     setVisibleLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -94,6 +113,11 @@ function App() {
       const [reorderedItem] = items.splice(source.index, 1);
       items.splice(destination.index, 0, reorderedItem);
       setTransportLayers(items);
+    } else if (listId === 'blueGreen') {
+      const items = Array.from(blueGreenLayers);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+      setBlueGreenLayers(items);
     } else if (listId === 'infrastructure') {
       const items = Array.from(infrastructureLayers);
       const [reorderedItem] = items.splice(source.index, 1);
@@ -172,7 +196,7 @@ function App() {
   };
 
   // 評分模式
-  const [scoringMode, setScoringMode] = useState('urbanist'); // default: urbanist
+  const [scoringMode, setScoringMode] = useState('commuter'); // default: commuter
 
   const scoringModes = [
     {
@@ -194,6 +218,29 @@ function App() {
       details: '100% 人行道品質 (實體 + 標線)'
     }
   ];
+
+  // 底圖選擇
+  const [selectedBasemap, setSelectedBasemap] = useState('dark'); // default: dark
+
+  const basemaps = {
+    dark: {
+      id: 'dark',
+      label: '暗色地圖 (Dark)',
+      url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+    },
+    light: {
+      id: 'light',
+      label: '明亮地圖 (Light)',
+      url: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    },
+    terrain: {
+      id: 'terrain',
+      label: '地形地圖 (Terrain)',
+      url: 'https://api.maptiler.com/maps/outdoor-v2/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
+    }
+  };
+
+  const [showMapLabels, setShowMapLabels] = useState(true); // Map labels toggle
 
   const handleGeolocation = () => {
     if (!navigator.geolocation) {
@@ -416,48 +463,7 @@ function App() {
           </div>
         </div>
 
-        {/* 資訊顯示區 (Moved here) */}
-        <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
-            Selection
-          </h2>
-          {selectedFeature ? (
-            <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
-              {selectedFeature.type === 'tree' ? (
-                <>
-                  <p>Type: <b style={{ color: selectedFeature.type === 'protected' ? '#f1c40f' : '#2ecc71' }}>
-                    {selectedFeature.type === 'protected' ? '受保護樹木 (Protected)' : '一般行道樹 (Normal)'}
-                  </b></p>
-                  <p>Name: <b>{selectedFeature.name}</b></p>
-                  <p>Address: <b>{selectedFeature.address}</b></p>
-                  <p>Diameter: <b>{selectedFeature.樹徑} cm</b></p>
-                  {selectedFeature.health && selectedFeature.health !== 'N/A' && (
-                    <p>Health: <b>{selectedFeature.health}</b></p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#f1c40f' }}>
-                    {selectedFeature[`score_${scoringMode}`] || selectedFeature.score} <span style={{ fontSize: '14px' }}>/ 10</span>
-                  </div>
-                  <p style={{ color: '#aaa', fontSize: '12px', marginBottom: '10px' }}>
-                    {scoringModes.find(m => m.id === scoringMode)?.label}
-                  </p>
-                  <hr style={{ borderColor: '#444', margin: '15px 0' }} />
-                  <p>MRT Dist: <b>{selectedFeature.dist_mrt} m</b></p>
-                  <p>Bus Dist: <b>{selectedFeature.dist_bus} m</b></p>
-                  <p>Trees: <b>{selectedFeature.tree_count || 0}</b></p>
-                  <p>Sidewalk Density: <b>{selectedFeature.sidewalk_density || 0}%</b></p>
-                  <p>Hex ID: <span style={{ fontSize: '10px', color: '#666' }}>{selectedFeature.hex_id}</span></p>
-                </>
-              )}
-            </div>
-          ) : (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>
-              Click on a hexagon to see details.
-            </p>
-          )}
-        </div>
+
 
         {/* 上傳的圖層管理 */}
         {uploadedLayers.length > 0 && (
@@ -539,6 +545,79 @@ function App() {
                 {(provided) => (
                   <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {transportLayers.map((layerKey, index) => {
+                      const config = layerConfig[layerKey];
+                      return (
+                        <Draggable key={layerKey} draggableId={layerKey} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                background: '#1a1a1a',
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid #444'
+                              }}
+                            >
+                              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
+                                <span style={{ marginRight: '8px', cursor: 'grab' }}>☰</span>
+                                <input
+                                  type="checkbox"
+                                  checked={visibleLayers[layerKey]}
+                                  onChange={() => toggleLayer(layerKey)}
+                                  style={{ marginRight: '8px' }}
+                                />
+                                <strong>{config.label}</strong>
+                              </label>
+
+                              {visibleLayers[layerKey] && (
+                                <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                                  {!config.noColor && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span>Color:</span>
+                                      <input
+                                        type="color"
+                                        value={layerStyles[layerKey].color}
+                                        onChange={(e) => updateLayerStyle(layerKey, 'color', e.target.value)}
+                                        style={{ width: '40px', height: '24px', border: 'none', cursor: 'pointer' }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>Opacity:</span>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={layerStyles[layerKey].opacity}
+                                      onChange={(e) => updateLayerStyle(layerKey, 'opacity', parseFloat(e.target.value))}
+                                      style={{ flex: 1 }}
+                                    />
+                                    <span>{layerStyles[layerKey].opacity.toFixed(1)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+
+            {/* Blue & Green Group */}
+            <div style={{ marginBottom: '15px' }}>
+              <h3 style={{ fontSize: '12px', color: '#27ae60', marginBottom: '8px', textTransform: 'uppercase' }}>生態水與綠 (Blue and Green)</h3>
+              <Droppable droppableId="blueGreen">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {blueGreenLayers.map((layerKey, index) => {
                       const config = layerConfig[layerKey];
                       return (
                         <Draggable key={layerKey} draggableId={layerKey} index={index}>
@@ -754,6 +833,48 @@ function App() {
           </DragDropContext>
         </div>
 
+        {/* 底圖選擇 (Basemap Selection) */}
+        <div style={{ background: '#2a2a2a', padding: '15px', borderRadius: '8px' }}>
+          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#888', marginBottom: '12px' }}>
+            底圖 (Basemap)
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {Object.values(basemaps).map(basemap => (
+              <label key={basemap.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                padding: '8px',
+                background: selectedBasemap === basemap.id ? '#444' : 'transparent',
+                borderRadius: '4px',
+                transition: 'background 0.2s'
+              }}>
+                <input
+                  type="radio"
+                  name="basemap"
+                  checked={selectedBasemap === basemap.id}
+                  onChange={() => setSelectedBasemap(basemap.id)}
+                  style={{ marginRight: '8px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '14px' }}>{basemap.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showMapLabels}
+                onChange={() => setShowMapLabels(!showMapLabels)}
+                style={{ marginRight: '8px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '13px', color: '#ccc' }}>顯示地圖資訊 (Show Map Info)</span>
+            </label>
+          </div>
+        </div>
+
         {/* 檔案上傳區 (Moved to bottom) */}
         <FileUpload onLayerAdd={handleLayerAdd} />
 
@@ -837,6 +958,10 @@ function App() {
             mrtStations: mrtStationsData,
             busStops: busStopsData,
             trees: treesData,
+            parks: parksData,
+            agriculture: agricultureData,
+            birdProtection: birdProtectionData,
+            natureProtection: natureProtectionData,
             roads: roadsData,
             sidewalksMarked: sidewalksMarkedData,
             sidewalksPhysical: sidewalksPhysicalData
@@ -848,7 +973,10 @@ function App() {
           searchLocation={searchLocation}
           uploadedLayers={uploadedLayers}
           treesData={treesData}
+          basemapUrl={basemaps[selectedBasemap].url}
+          showMapLabels={showMapLabels}
           onSelectFeature={setSelectedFeature}
+          selectedFeature={selectedFeature}
         />
       </div>
 
@@ -886,6 +1014,85 @@ function App() {
       >
         ✉️
       </a>
+      {/* Floating Selection Panel - Top Right */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        width: '320px',
+        background: '#1a1a1a',
+        borderRadius: '8px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.7)',
+        zIndex: 1000,
+        overflow: 'hidden',
+        border: '1px solid #444'
+      }}>
+        {/* Header with collapse button */}
+        <div
+          onClick={() => setIsSelectionOpen(!isSelectionOpen)}
+          style={{
+            padding: '12px 15px',
+            background: '#2a2a2a',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: isSelectionOpen ? '1px solid #444' : 'none',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#2a2a2a'}
+        >
+          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', margin: 0 }}>
+            Selection
+          </h2>
+          <span style={{ fontSize: '18px', color: '#aaa', transition: 'transform 0.3s', transform: isSelectionOpen ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+            ▲
+          </span>
+        </div>
+
+        {/* Content */}
+        {isSelectionOpen && (
+          <div style={{ padding: '15px' }}>
+            {selectedFeature ? (
+              <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#fff' }}>
+                {selectedFeature.type === 'tree' ? (
+                  <>
+                    <p>Type: <b style={{ color: selectedFeature.type === 'protected' ? '#f1c40f' : '#2ecc71' }}>
+                      {selectedFeature.type === 'protected' ? '受保護樹木 (Protected)' : '一般行道樹 (Normal)'}
+                    </b></p>
+                    <p>Name: <b>{selectedFeature.name}</b></p>
+                    <p>Address: <b>{selectedFeature.address}</b></p>
+                    <p>Diameter: <b>{selectedFeature.樹徑} cm</b></p>
+                    {selectedFeature.health && selectedFeature.health !== 'N/A' && (
+                      <p>Health: <b>{selectedFeature.health}</b></p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#f1c40f' }}>
+                      {selectedFeature[`score_${scoringMode}`] || selectedFeature.score} <span style={{ fontSize: '14px' }}>/ 10</span>
+                    </div>
+                    <p style={{ color: '#aaa', fontSize: '12px', marginBottom: '10px' }}>
+                      {scoringModes.find(m => m.id === scoringMode)?.label}
+                    </p>
+                    <hr style={{ borderColor: '#444', margin: '15px 0' }} />
+                    <p>MRT Dist: <b>{selectedFeature.dist_mrt} m</b></p>
+                    <p>Bus Dist: <b>{selectedFeature.dist_bus} m</b></p>
+                    <p>Trees: <b>{selectedFeature.tree_count || 0}</b></p>
+                    <p>Sidewalk Density: <b>{selectedFeature.sidewalk_density || 0}%</b></p>
+                    <p>Hex ID: <span style={{ fontSize: '10px', color: '#666' }}>{selectedFeature.hex_id}</span></p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p style={{ color: '#666', fontStyle: 'italic', margin: 0 }}>
+                Click on a hexagon to see details.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

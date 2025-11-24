@@ -1,16 +1,31 @@
-# React + Vite
+# Taipei Walk Map - 台北步行地圖
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**探索城市步行友善度的互動式地圖應用**
 
-Currently, two official plugins are available:
+Created by Yun-Ching Wu（吳昀慶）| [LinkedIn](https://www.linkedin.com/in/yunching0513/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 專案簡介
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Taipei Walk Map 是一個專注於台北市步行友善度分析的互動式地圖平台。透過整合多維度的城市數據，包括大眾運輸網絡、人行道覆蓋、行道樹分布等資訊，系統運用 H3 六邊形網格技術將台北市劃分為精細的分析單元，為每個區域計算步行友善度評分。
 
-## Expanding the ESLint configuration
+本專案提供多種評分模式，滿足不同使用者需求：**效率通勤**模式重視交通便利性，適合上班族；**舒適漫步**模式強調實體人行道與綠蔭，適合休閒散步；**純粹步行**模式則專注於人行空間品質評估。使用者可依據自身需求選擇合適的評分模式，搭配可調整的圖層系統，深入探索台北市各區域的步行環境特色。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+地圖整合了豐富的城市資料層，包括捷運線路與站點、公車站牌、道路網絡、人行道（實體與標線型）、行道樹（含受保護樹木）、行政區界與里界等。每個圖層均可獨立控制顯示與透明度，並支援拖曳排序調整圖層順序。點擊地圖上的元素（如行道樹、里界）會顯示詳細資訊卡片，提供名稱、地址、健康度等數據。
+
+系統採用現代化的響應式設計，在桌面與行動裝置上均能流暢使用。介面支援側邊欄收合、地點搜尋、一鍵定位等便利功能。視覺設計採用深色底圖配合清晰的圖層標示，並整合比例尺、指北針等專業地圖工具。
+
+技術實作方面，前端使用 React 與 MapLibre GL JS 構建互動地圖，後端資料處理採用 Python 搭配 GeoPandas、H3 等地理分析套件。所有評分指標均基於客觀的空間分析計算，包括最近捷運站距離、公車站密度、人行道覆蓋率、行道樹數量等，並透過加權整合產生綜合評分。
+
+本專案不僅是技術展示，更期望成為推動城市步行環境改善的實用工具，協助市民、規劃者與決策者理解並優化台北市的步行友善度。
+
+## 技術棧
+
+- **前端**: React, MapLibre GL JS, Vite
+- **後端**: Python, GeoPandas, H3, Pandas
+- **部署**: Vercel
+
+## 聯絡
+
+如有任何建議或回饋，歡迎透過 [jtl0513@gmail.com](mailto:jtl0513@gmail.com) 聯繫。

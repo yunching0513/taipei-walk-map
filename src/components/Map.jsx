@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-export default function Map({ layers, visibleLayers, layerStyles, layerOrder, scoringMode, searchLocation, uploadedLayers, treesData, onSelectFeature }) {
+export default function Map({ layers, visibleLayers, layerStyles, layerOrder, scoringMode, searchLocation, uploadedLayers, treesData, basemapUrl, showMapLabels, onSelectFeature, selectedFeature }) {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const searchMarker = useRef(null);
     const uploadedLayerIds = useRef(new Set());
+    const listenersBound = useRef(false);
+    const hoveredHexId = useRef(null);
 
     const [isLoaded, setIsLoaded] = useState(false);
 
@@ -15,7 +17,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
 
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+            style: basemapUrl, // Use dynamic basemap URL
             center: [121.54, 25.05],
             zoom: 12,
             pitch: 45,
@@ -25,8 +27,17 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         map.current.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-right');
 
         map.current.on('load', () => {
+            setIsLoaded(true);
+        });
+    }, []);
+
+    // Initialize Layers (Re-run when isLoaded becomes true, e.g. after basemap switch)
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        const addLayers = () => {
             // --- 1. Districts (Polygon) ---
-            if (layers.districts) {
+            if (layers.districts && !map.current.getSource('districts')) {
                 map.current.addSource('districts', { type: 'geojson', data: layers.districts });
                 map.current.addLayer({
                     id: 'districts-line',
@@ -57,7 +68,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             }
 
             // --- 1b. Villages (Polygon) ---
-            if (layers.villages) {
+            if (layers.villages && !map.current.getSource('villages')) {
                 map.current.addSource('villages', { type: 'geojson', data: layers.villages });
                 map.current.addLayer({
                     id: 'villages-line',
@@ -69,7 +80,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             }
 
             // --- 2. Roads (Polygon) ---
-            if (layers.roads) {
+            if (layers.roads && !map.current.getSource('roads')) {
                 map.current.addSource('roads', { type: 'geojson', data: layers.roads });
                 map.current.addLayer({
                     id: 'roads-fill',
@@ -80,9 +91,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
             }
 
-
             // --- 3a. Sidewalks Marked (標線型人行道) ---
-            if (layers.sidewalksMarked) {
+            if (layers.sidewalksMarked && !map.current.getSource('sidewalks-marked')) {
                 map.current.addSource('sidewalks-marked', { type: 'geojson', data: layers.sidewalksMarked });
                 map.current.addLayer({
                     id: 'sidewalks-marked-fill',
@@ -94,7 +104,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             }
 
             // --- 3b. Sidewalks Physical (實體人行道) ---
-            if (layers.sidewalksPhysical) {
+            if (layers.sidewalksPhysical && !map.current.getSource('sidewalks-physical')) {
                 map.current.addSource('sidewalks-physical', { type: 'geojson', data: layers.sidewalksPhysical });
                 map.current.addLayer({
                     id: 'sidewalks-physical-fill',
@@ -105,10 +115,13 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
             }
 
-
             // --- 4. Grid (Hexagon) ---
-            if (layers.grid) {
-                map.current.addSource('grid', { type: 'geojson', data: layers.grid });
+            if (layers.grid && !map.current.getSource('grid')) {
+                map.current.addSource('grid', {
+                    type: 'geojson',
+                    data: layers.grid,
+                    promoteId: 'hex_id' // Ensure we can identify features by ID for state
+                });
                 map.current.addLayer({
                     id: 'grid-fill',
                     type: 'fill',
@@ -116,72 +129,268 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     layout: { visibility: visibleLayers.grid ? 'visible' : 'none' },
                     paint: {
                         'fill-color': [
-                            'interpolate', ['linear'], ['get', 'score'], // Default to 'score' initially
+                            'interpolate', ['linear'], ['get', `score_${scoringMode}`],
                             0, '#2c3e50',
                             5, '#e67e22',
                             10, '#f1c40f'
                         ],
-                        'fill-opacity': 0.8,
+                        'fill-opacity': [
+                            'case',
+                            ['boolean', ['feature-state', 'hover'], false],
+                            0.9, // Higher opacity on hover
+                            0.8  // Default opacity
+                        ],
                         'fill-outline-color': 'rgba(255,255,255,0.05)'
                     }
                 });
 
-                // Click event for Grid
-                map.current.on('click', 'grid-fill', (e) => {
-                    if (e.features.length > 0) {
-                        const feature = e.features[0];
-                        onSelectFeature({ ...feature.properties, type: 'hex' }); // Add type identifier
+                // Add Highlight Layer (Stroke)
+                map.current.addLayer({
+                    id: 'grid-highlight',
+                    type: 'line',
+                    source: 'grid',
+                    layout: { visibility: visibleLayers.grid ? 'visible' : 'none' },
+                    paint: {
+                        'line-color': '#ffffff',
+                        'line-width': [
+                            'case',
+                            ['boolean', ['feature-state', 'selected'], false], 3, // Selected width
+                            ['boolean', ['feature-state', 'hover'], false], 2,   // Hover width
+                            0 // Default width (hidden)
+                        ],
+                        'line-opacity': [
+                            'case',
+                            ['boolean', ['feature-state', 'selected'], false], 1,
+                            ['boolean', ['feature-state', 'hover'], false], 0.8,
+                            0
+                        ]
                     }
                 });
 
-                // Click event for Trees
-                map.current.on('click', 'trees-layer', (e) => {
-                    if (e.features.length > 0) {
-                        const feature = e.features[0];
-                        const props = feature.properties;
+                if (!listenersBound.current) {
+                    // Click event for Grid
+                    map.current.on('click', 'grid-fill', (e) => {
+                        if (e.features.length > 0) {
+                            const feature = e.features[0];
+                            onSelectFeature({ ...feature.properties, type: 'hex' });
+                        }
+                    });
 
-                        // Create Popup
-                        const coordinates = feature.geometry.coordinates.slice();
-                        const isProtected = props.type === 'protected';
-                        const typeLabel = isProtected ? '受保護樹木 (Protected)' : '一般行道樹 (Normal)';
-                        const typeColor = isProtected ? '#f1c40f' : '#2ecc71';
+                    // Hover effects for Grid
+                    map.current.on('mousemove', 'grid-fill', (e) => {
+                        map.current.getCanvas().style.cursor = 'pointer';
+                        if (e.features.length > 0) {
+                            if (hoveredHexId.current !== null) {
+                                map.current.setFeatureState(
+                                    { source: 'grid', id: hoveredHexId.current },
+                                    { hover: false }
+                                );
+                            }
+                            hoveredHexId.current = e.features[0].id;
+                            map.current.setFeatureState(
+                                { source: 'grid', id: hoveredHexId.current },
+                                { hover: true }
+                            );
+                        }
+                    });
 
-                        const htmlContent = `
-                        <div style="font-family: sans-serif; font-size: 12px; line-height: 1.5; color: #333;">
-                            <strong style="color: ${typeColor}; font-size: 14px;">${typeLabel}</strong><br/>
-                            <strong>Name:</strong> ${props.name}<br/>
-                            <strong>Address:</strong> ${props.address}<br/>
-                            <strong>Diameter:</strong> ${props.樹徑} cm<br/>
-                            ${props.health && props.health !== 'N/A' ? `<strong>Health:</strong> ${props.health}` : ''}
-                        </div>
-                    `;
+                    map.current.on('mouseleave', 'grid-fill', () => {
+                        map.current.getCanvas().style.cursor = '';
+                        if (hoveredHexId.current !== null) {
+                            map.current.setFeatureState(
+                                { source: 'grid', id: hoveredHexId.current },
+                                { hover: false }
+                            );
+                        }
+                        hoveredHexId.current = null;
+                    });
+                }
+            }
 
-                        new maplibregl.Popup()
-                            .setLngLat(coordinates)
-                            .setHTML(htmlContent)
-                            .addTo(map.current);
+            // --- 5. MRT Lines (Line) ---
+            if (layers.mrtLines && !map.current.getSource('mrt-lines')) {
+                map.current.addSource('mrt-lines', { type: 'geojson', data: layers.mrtLines });
+                map.current.addLayer({
+                    id: 'mrt-lines-layer',
+                    type: 'line',
+                    source: 'mrt-lines',
+                    layout: { visibility: visibleLayers.mrtLines ? 'visible' : 'none' },
+                    paint: {
+                        'line-color': [
+                            'match', ['get', 'RouteName'],
+                            '淡水信義線', '#e74c3c',
+                            '板南線', '#3498db',
+                            '文湖線', '#9b59b6',
+                            '松山新店線', '#2ecc71',
+                            '中和新蘆線', '#f1c40f',
+                            '環狀線', '#f39c12',
+                            '#95a5a6'
+                        ],
+                        'line-width': 3
+                    }
+                });
+            }
 
-                        // Also select feature for sidebar (optional, but good for consistency)
-                        onSelectFeature({ ...props, type: 'tree' });
+            // --- 6. MRT Stations (Point) ---
+            if (layers.mrtStations && !map.current.getSource('mrt-stations')) {
+                map.current.addSource('mrt-stations', { type: 'geojson', data: layers.mrtStations });
+                map.current.addLayer({
+                    id: 'mrt-stations-layer',
+                    type: 'circle',
+                    source: 'mrt-stations',
+                    layout: { visibility: visibleLayers.mrtStations ? 'visible' : 'none' },
+                    paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-width': 2, 'circle-stroke-color': '#e74c3c' }
+                });
+            }
+
+            // --- 7. Bus Stops (Point) ---
+            if (layers.busStops && !map.current.getSource('bus-stops')) {
+                map.current.addSource('bus-stops', { type: 'geojson', data: layers.busStops });
+                map.current.addLayer({
+                    id: 'bus-stops-layer',
+                    type: 'circle',
+                    source: 'bus-stops',
+                    layout: { visibility: visibleLayers.busStops ? 'visible' : 'none' },
+                    paint: {
+                        'circle-radius': 2.5,
+                        'circle-color': '#f39c12',
+                        'circle-opacity': 0.8,
+                        'circle-stroke-width': 1,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-stroke-opacity': 0.6
+                    }
+                });
+            }
+
+            // --- 8. Trees (Point) ---
+            if (layers.trees && !map.current.getSource('trees')) {
+                map.current.addSource('trees', { type: 'geojson', data: layers.trees });
+                map.current.addLayer({
+                    id: 'trees-layer',
+                    type: 'circle',
+                    source: 'trees',
+                    layout: { visibility: visibleLayers.trees ? 'visible' : 'none' },
+                    paint: {
+                        'circle-radius': [
+                            'interpolate', ['linear'], ['zoom'],
+                            11, 0.5,
+                            15, ['*', ['get', '樹徑'], 0.05]
+                        ],
+                        'circle-color': [
+                            'match',
+                            ['get', 'type'],
+                            'protected', '#f1c40f',
+                            layerStyles.trees.color
+                        ],
+                        'circle-opacity': layerStyles.trees.opacity,
+                        'circle-stroke-width': 0,
+                        'circle-stroke-color': '#ffffff'
                     }
                 });
 
-                // Change cursor on hover (Grid)
-                map.current.on('mouseenter', 'grid-fill', () => {
-                    map.current.getCanvas().style.cursor = 'pointer';
-                });
-                map.current.on('mouseleave', 'grid-fill', () => {
-                    map.current.getCanvas().style.cursor = '';
-                });
+                if (!listenersBound.current) {
+                    // Click event for Trees
+                    map.current.on('click', 'trees-layer', (e) => {
+                        if (e.features.length > 0) {
+                            const feature = e.features[0];
+                            const props = feature.properties;
 
-                // Change cursor on hover (Trees)
-                map.current.on('mouseenter', 'trees-layer', () => {
-                    map.current.getCanvas().style.cursor = 'pointer';
-                });
-                map.current.on('mouseleave', 'trees-layer', () => {
-                    map.current.getCanvas().style.cursor = '';
-                });
+                            const coordinates = feature.geometry.coordinates.slice();
+                            const isProtected = props.type === 'protected';
+                            const typeLabel = isProtected ? '受保護樹木 (Protected)' : '一般行道樹 (Normal)';
+                            const typeColor = isProtected ? '#f1c40f' : '#2ecc71';
 
+                            const htmlContent = `
+                            <div style="font-family: sans-serif; font-size: 12px; line-height: 1.5; color: #333;">
+                                <strong style="color: ${typeColor}; font-size: 14px;">${typeLabel}</strong><br/>
+                                <strong>Name:</strong> ${props.name}<br/>
+                                <strong>Address:</strong> ${props.address}<br/>
+                                <strong>Diameter:</strong> ${props.樹徑} cm<br/>
+                                ${props.health && props.health !== 'N/A' ? `<strong>Health:</strong> ${props.health}` : ''}
+                            </div>
+                        `;
+
+                            new maplibregl.Popup()
+                                .setLngLat(coordinates)
+                                .setHTML(htmlContent)
+                                .addTo(map.current);
+
+                            onSelectFeature({ ...props, type: 'tree' });
+                        }
+                    });
+
+                    // Change cursor on hover (Trees)
+                    map.current.on('mouseenter', 'trees-layer', () => {
+                        map.current.getCanvas().style.cursor = 'pointer';
+                    });
+                    map.current.on('mouseleave', 'trees-layer', () => {
+                        map.current.getCanvas().style.cursor = '';
+                    });
+                }
+            }
+
+            // --- 9. Parks (Polygon) ---
+            if (layers.parks && !map.current.getSource('parks')) {
+                map.current.addSource('parks', { type: 'geojson', data: layers.parks });
+                map.current.addLayer({
+                    id: 'parks-fill',
+                    type: 'fill',
+                    source: 'parks',
+                    layout: { visibility: visibleLayers.parks ? 'visible' : 'none' },
+                    paint: {
+                        'fill-color': layerStyles.parks.color,
+                        'fill-opacity': layerStyles.parks.opacity
+                    }
+                });
+            }
+
+            // --- 10. Agriculture (Polygon) ---
+            if (layers.agriculture && !map.current.getSource('agriculture')) {
+                map.current.addSource('agriculture', { type: 'geojson', data: layers.agriculture });
+                map.current.addLayer({
+                    id: 'agriculture-fill',
+                    type: 'fill',
+                    source: 'agriculture',
+                    layout: { visibility: visibleLayers.agriculture ? 'visible' : 'none' },
+                    paint: {
+                        'fill-color': layerStyles.agriculture.color,
+                        'fill-opacity': layerStyles.agriculture.opacity
+                    }
+                });
+            }
+
+            // --- 11. Bird Protection (Polygon) ---
+            if (layers.birdProtection && !map.current.getSource('bird-protection')) {
+                map.current.addSource('bird-protection', { type: 'geojson', data: layers.birdProtection });
+                map.current.addLayer({
+                    id: 'bird-protection-fill',
+                    type: 'fill',
+                    source: 'bird-protection',
+                    layout: { visibility: visibleLayers.birdProtection ? 'visible' : 'none' },
+                    paint: {
+                        'fill-color': layerStyles.birdProtection.color,
+                        'fill-opacity': layerStyles.birdProtection.opacity
+                    }
+                });
+            }
+
+            // --- 12. Nature Protection (Polygon) ---
+            if (layers.natureProtection && !map.current.getSource('nature-protection')) {
+                map.current.addSource('nature-protection', { type: 'geojson', data: layers.natureProtection });
+                map.current.addLayer({
+                    id: 'nature-protection-fill',
+                    type: 'fill',
+                    source: 'nature-protection',
+                    layout: { visibility: visibleLayers.natureProtection ? 'visible' : 'none' },
+                    paint: {
+                        'fill-color': layerStyles.natureProtection.color,
+                        'fill-opacity': layerStyles.natureProtection.opacity
+                    }
+                });
+            }
+
+            // Villages listeners (if not bound)
+            if (layers.villages && !listenersBound.current) {
                 // Click event for Villages
                 map.current.on('click', 'villages-line', (e) => {
                     if (e.features.length > 0) {
@@ -209,91 +418,11 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
             }
 
-            // --- 5. MRT Lines (Line) ---
-            if (layers.mrtLines) {
-                map.current.addSource('mrt-lines', { type: 'geojson', data: layers.mrtLines });
-                map.current.addLayer({
-                    id: 'mrt-lines-layer',
-                    type: 'line',
-                    source: 'mrt-lines',
-                    layout: { visibility: visibleLayers.mrtLines ? 'visible' : 'none' },
-                    paint: {
-                        'line-color': [
-                            'match', ['get', 'RouteName'],
-                            '淡水信義線', '#e74c3c',
-                            '板南線', '#3498db',
-                            '文湖線', '#9b59b6',
-                            '松山新店線', '#2ecc71',
-                            '中和新蘆線', '#f1c40f',
-                            '環狀線', '#f39c12',
-                            '#95a5a6' // default
-                        ],
-                        'line-width': 3
-                    }
-                });
-            }
+            listenersBound.current = true;
+        };
 
-            // --- 6. MRT Stations (Point) ---
-            if (layers.mrtStations) {
-                map.current.addSource('mrt-stations', { type: 'geojson', data: layers.mrtStations });
-                map.current.addLayer({
-                    id: 'mrt-stations-layer',
-                    type: 'circle',
-                    source: 'mrt-stations',
-                    layout: { visibility: visibleLayers.mrtStations ? 'visible' : 'none' },
-                    paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-width': 2, 'circle-stroke-color': '#e74c3c' }
-                });
-            }
-
-            // --- 7. Bus Stops (Point) ---
-            if (layers.busStops) {
-                map.current.addSource('bus-stops', { type: 'geojson', data: layers.busStops });
-                map.current.addLayer({
-                    id: 'bus-stops-layer',
-                    type: 'circle',
-                    source: 'bus-stops',
-                    layout: { visibility: visibleLayers.busStops ? 'visible' : 'none' },
-                    paint: {
-                        'circle-radius': 2.5,
-                        'circle-color': '#f39c12',
-                        'circle-opacity': 0.8,
-                        'circle-stroke-width': 1,
-                        'circle-stroke-color': '#ffffff',
-                        'circle-stroke-opacity': 0.6
-                    }
-                });
-            }
-
-            // --- 8. Trees (Point) ---
-            if (layers.trees) {
-                map.current.addSource('trees', { type: 'geojson', data: layers.trees });
-                map.current.addLayer({
-                    id: 'trees-layer',
-                    type: 'circle',
-                    source: 'trees',
-                    layout: { visibility: visibleLayers.trees ? 'visible' : 'none' },
-                    paint: {
-                        'circle-radius': [
-                            'interpolate', ['linear'], ['zoom'],
-                            11, 0.5, // Reduced from 1 to 0.5
-                            15, ['*', ['get', '樹徑'], 0.05] // Reduced multiplier from 0.1 to 0.05
-                        ],
-                        'circle-color': [
-                            'match',
-                            ['get', 'type'],
-                            'protected', '#f1c40f', // Gold for protected trees
-                            layerStyles.trees.color // Default/User color for normal trees
-                        ],
-                        'circle-opacity': layerStyles.trees.opacity,
-                        'circle-stroke-width': 0,
-                        'circle-stroke-color': '#ffffff'
-                    }
-                });
-            }
-
-            setIsLoaded(true); // Mark as loaded
-        });
-    }, []);
+        addLayers();
+    }, [isLoaded, layers, visibleLayers, layerStyles, scoringMode]);
 
     // Update Visibility and Layer Order
     useEffect(() => {
@@ -313,6 +442,10 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         setVisibility('mrt-stations-layer', visibleLayers.mrtStations);
         setVisibility('bus-stops-layer', visibleLayers.busStops);
         setVisibility('trees-layer', visibleLayers.trees);
+        setVisibility('parks-fill', visibleLayers.parks);
+        setVisibility('agriculture-fill', visibleLayers.agriculture);
+        setVisibility('bird-protection-fill', visibleLayers.birdProtection);
+        setVisibility('nature-protection-fill', visibleLayers.natureProtection);
         setVisibility('roads-fill', visibleLayers.roads);
         setVisibility('sidewalks-marked-fill', visibleLayers.sidewalksMarked);
         setVisibility('sidewalks-physical-fill', visibleLayers.sidewalksPhysical);
@@ -331,6 +464,10 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             'mrtStations': ['mrt-stations-layer'],
             'busStops': ['bus-stops-layer'],
             'trees': ['trees-layer'],
+            'parks': ['parks-fill'],
+            'agriculture': ['agriculture-fill'],
+            'birdProtection': ['bird-protection-fill'],
+            'natureProtection': ['nature-protection-fill'],
             'mrtLines': ['mrt-lines-layer'],
             'roads': ['roads-fill'],
             'sidewalksMarked': ['sidewalks-marked-fill'],
@@ -412,6 +549,30 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             map.current.setPaintProperty('trees-layer', 'circle-opacity', layerStyles.trees.opacity);
         }
 
+        // Parks
+        if (map.current.getLayer('parks-fill')) {
+            map.current.setPaintProperty('parks-fill', 'fill-color', layerStyles.parks.color);
+            map.current.setPaintProperty('parks-fill', 'fill-opacity', layerStyles.parks.opacity);
+        }
+
+        // Agriculture
+        if (map.current.getLayer('agriculture-fill')) {
+            map.current.setPaintProperty('agriculture-fill', 'fill-color', layerStyles.agriculture.color);
+            map.current.setPaintProperty('agriculture-fill', 'fill-opacity', layerStyles.agriculture.opacity);
+        }
+
+        // Bird Protection
+        if (map.current.getLayer('bird-protection-fill')) {
+            map.current.setPaintProperty('bird-protection-fill', 'fill-color', layerStyles.birdProtection.color);
+            map.current.setPaintProperty('bird-protection-fill', 'fill-opacity', layerStyles.birdProtection.opacity);
+        }
+
+        // Nature Protection
+        if (map.current.getLayer('nature-protection-fill')) {
+            map.current.setPaintProperty('nature-protection-fill', 'fill-color', layerStyles.natureProtection.color);
+            map.current.setPaintProperty('nature-protection-fill', 'fill-opacity', layerStyles.natureProtection.opacity);
+        }
+
         // Roads
         if (map.current.getLayer('roads-fill')) {
             map.current.setPaintProperty('roads-fill', 'fill-color', layerStyles.roads.color);
@@ -431,6 +592,58 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         }
 
     }, [layerStyles]);
+
+    // Update Grid Color based on Scoring Mode
+    useEffect(() => {
+        if (!map.current || !isLoaded || !scoringMode) return;
+
+        if (map.current.getLayer('grid-fill')) {
+            // Define color schemes for each scoring mode
+            let colorScheme;
+
+            if (scoringMode === 'commuter') {
+                // Pink gradient (light to dark pink)
+                colorScheme = [
+                    'interpolate', ['linear'], ['get', `score_${scoringMode}`],
+                    0, '#f5e6f0',   // Very light pink
+                    3, '#e8b4d4',   // Light pink
+                    5, '#db82b8',   // Medium pink
+                    7, '#ce509c',   // Dark pink
+                    10, '#c11e80'   // Very dark pink
+                ];
+            } else if (scoringMode === 'stroller') {
+                // Green gradient (light to dark green)
+                colorScheme = [
+                    'interpolate', ['linear'], ['get', `score_${scoringMode}`],
+                    0, '#e8f5e9',   // Very light green
+                    3, '#a5d6a7',   // Light green
+                    5, '#66bb6a',   // Medium green
+                    7, '#43a047',   // Dark green
+                    10, '#2e7d32'   // Very dark green
+                ];
+            } else if (scoringMode === 'pedestrian') {
+                // Blue gradient (light to dark blue)
+                colorScheme = [
+                    'interpolate', ['linear'], ['get', `score_${scoringMode}`],
+                    0, '#e3f2fd',   // Very light blue
+                    3, '#90caf9',   // Light blue
+                    5, '#42a5f5',   // Medium blue
+                    7, '#1e88e5',   // Dark blue
+                    10, '#1565c0'   // Very dark blue
+                ];
+            } else {
+                // Default yellow/orange gradient (original)
+                colorScheme = [
+                    'interpolate', ['linear'], ['get', 'score'],
+                    0, '#2c3e50',
+                    5, '#e67e22',
+                    10, '#f1c40f'
+                ];
+            }
+
+            map.current.setPaintProperty('grid-fill', 'fill-color', colorScheme);
+        }
+    }, [scoringMode, isLoaded]);
 
     // Handle Search Location
     useEffect(() => {
@@ -552,5 +765,128 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
 
     }, [uploadedLayers]);
 
-    return <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />;
+    // Handle Basemap Switching
+    useEffect(() => {
+        if (!map.current || !basemapUrl) return;
+
+        // Save current state
+        const currentCenter = map.current.getCenter();
+        const currentZoom = map.current.getZoom();
+        const currentPitch = map.current.getPitch();
+        const currentBearing = map.current.getBearing();
+
+        // Set isLoaded to false to prevent layer effects from running prematurely
+        setIsLoaded(false);
+
+        // Set new style
+        map.current.setStyle(basemapUrl);
+
+        // Restore camera position after style loads
+        map.current.once('styledata', () => {
+            map.current.jumpTo({
+                center: currentCenter,
+                zoom: currentZoom,
+                pitch: currentPitch,
+                bearing: currentBearing
+            });
+
+            // Mark as loaded to trigger layer re-initialization
+            setIsLoaded(true);
+        });
+
+    }, [basemapUrl]);
+
+    // Handle Map Labels Visibility
+    useEffect(() => {
+        if (!map.current || !map.current.isStyleLoaded()) return;
+
+        // This will hide/show all label layers in the basemap
+        const style = map.current.getStyle();
+        if (!style || !style.layers) return;
+
+        style.layers.forEach(layer => {
+            // Check if it's a symbol/text layer (labels)
+            if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+                map.current.setLayoutProperty(
+                    layer.id,
+                    'visibility',
+                    showMapLabels ? 'visible' : 'none'
+                );
+            }
+        });
+
+    }, [showMapLabels]);
+
+    // Handle Selection State
+    const selectedHexId = useRef(null);
+
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        // Clear previous selection
+        if (selectedHexId.current !== null) {
+            if (map.current.getSource('grid')) {
+                map.current.setFeatureState(
+                    { source: 'grid', id: selectedHexId.current },
+                    { selected: false }
+                );
+            }
+            selectedHexId.current = null;
+        }
+
+        // Set new selection
+        if (selectedFeature && selectedFeature.type === 'hex' && selectedFeature.hex_id) {
+            selectedHexId.current = selectedFeature.hex_id;
+            if (map.current.getSource('grid')) {
+                map.current.setFeatureState(
+                    { source: 'grid', id: selectedHexId.current },
+                    { selected: true }
+                );
+            }
+        }
+    }, [selectedFeature, isLoaded]);
+
+    return (
+        <div ref={mapContainer} style={{ width: '100%', height: '100%', position: 'relative' }}>
+            {!isLoaded && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2000,
+                    color: '#fff',
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        width: '40px',
+                        height: '40px',
+                        border: '4px solid rgba(255, 255, 255, 0.3)',
+                        borderTop: '4px solid #f1c40f',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        marginBottom: '16px'
+                    }} />
+                    <div style={{ fontSize: '16px', fontWeight: '500', letterSpacing: '1px' }}>
+                        載入地圖資料中...
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>
+                        Loading Map Data...
+                    </div>
+                    <style>{`
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+                    `}</style>
+                </div>
+            )}
+        </div>
+    );
 }
