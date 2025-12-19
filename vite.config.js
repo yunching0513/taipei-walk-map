@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api/BigData': {
+        target: 'https://hms.udd.gov.taipei',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 })

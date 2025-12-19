@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import './mobile.css';
 import Map from './components/Map';
@@ -24,11 +24,15 @@ import parksData from './data/taipei_parks.json';
 import agricultureData from './data/taipei_agriculture.json';
 import birdProtectionData from './data/taipei_bird_protection.json';
 import natureProtectionData from './data/taipei_nature_protection.json';
+import socialHousingRawData from './data/taipei_social_housing.json'; // Import local social housing data
 
 function App() {
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [selectedMainPlanZones, setSelectedMainPlanZones] = useState([]); // State for selected zones
   const [expandedCategories, setExpandedCategories] = useState({}); // State for expanded categories
+
+  const [socialHousingData, setSocialHousingData] = useState(null); // State for social housing data (GeoJSON points)
+  const [socialHousingStatus, setSocialHousingStatus] = useState('all'); // State for social housing choropleth filter
 
   // 圖層開關狀態
   const [visibleLayers, setVisibleLayers] = useState({
@@ -40,13 +44,12 @@ function App() {
     mrtStations: false,
     busStops: false,
     trees: false,
-    parks: false,
-    agriculture: false,
-    birdProtection: false,
-    natureProtection: false,
+    ecoProtection: false, // Group: Parks, Agriculture, Bird, Nature
     roads: false,
     sidewalksMarked: false,
-    sidewalksPhysical: false
+    sidewalksPhysical: false,
+    socialHousing: false, // Add Social Housing (Points)
+    socialHousingChoropleth: false // Add Social Housing (Choropleth)
   });
 
   // 圖層樣式 (顏色和透明度)
@@ -59,24 +62,25 @@ function App() {
     mrtStations: { color: '#e74c3c', opacity: 1.0 },
     busStops: { color: '#f39c12', opacity: 0.8 },
     trees: { color: '#27ae60', opacity: 0.8 },
-    parks: { color: '#4caf50', opacity: 0.6 },
-    agriculture: { color: '#9ccc65', opacity: 0.5 },
-    birdProtection: { color: '#26a69a', opacity: 0.6 },
-    natureProtection: { color: '#1b5e20', opacity: 0.7 },
+    ecoProtection: { color: '#4caf50', opacity: 0.6 }, // Group style
     roads: { color: '#ffffff', opacity: 1.0 },
     sidewalksMarked: { color: '#2ecc71', opacity: 1.0 },
-    sidewalksPhysical: { color: '#3498db', opacity: 0.5 }
+    sidewalksPhysical: { color: '#3498db', opacity: 0.5 },
+    socialHousing: { color: '#f7e18bff', opacity: 0.8 }, // Add Social Housing style
+    socialHousingChoropleth: { opacity: 0.6 } // Add Social Housing Choropleth style
   });
 
   // 圖層順序 (由上到下，對應地圖上的 z-index 由大到小)
   // Layer Groups State
   const [transportLayers, setTransportLayers] = useState(['mrtStations', 'busStops', 'mrtLines']);
-  const [blueGreenLayers, setBlueGreenLayers] = useState(['trees', 'parks', 'agriculture', 'birdProtection', 'natureProtection']);
+  const [blueGreenLayers, setBlueGreenLayers] = useState(['trees', 'ecoProtection']);
+  const [socialHousingLayers, setSocialHousingLayers] = useState(['socialHousing', 'socialHousingChoropleth']); // New Group
   const [infrastructureLayers, setInfrastructureLayers] = useState(['sidewalksMarked', 'sidewalksPhysical', 'roads']);
-  const [adminLayers, setAdminLayers] = useState(['villages', 'districts', 'mainPlan']); // Add mainPlan here
 
-  // Combined layer order for Map (Transport > Blue&Green > Infra > Admin)
-  const layerOrder = [...transportLayers, ...blueGreenLayers, ...infrastructureLayers, ...adminLayers];
+  const [adminLayers, setAdminLayers] = useState(['villages', 'districts', 'mainPlan']); // Removed socialHousing layers from here
+
+  // Combined layer order for Map (Transport > Blue&Green > Social Housing > Infra > Admin)
+  const layerOrder = [...transportLayers, ...blueGreenLayers, ...socialHousingLayers, ...infrastructureLayers, ...adminLayers];
 
   // 圖層配置 (用於渲染列表)
   const layerConfig = {
@@ -84,17 +88,17 @@ function App() {
     mrtLines: { label: '捷運路網 (MRT Lines)', type: 'line', noColor: true },
     busStops: { label: '公車站 (Bus Stops)', type: 'point' },
     trees: { label: '行道樹 (Trees)', type: 'point' },
-    parks: { label: '公園 (Parks)', type: 'polygon' },
-    agriculture: { label: '農業區 (Agriculture)', type: 'polygon' },
-    birdProtection: { label: '野鳥保護區 (Bird Protection)', type: 'polygon' },
-    natureProtection: { label: '自然保護區 (Nature Protection)', type: 'polygon' },
+    ecoProtection: { label: '生態保護區 (Eco Protection)', type: 'polygon' },
     roads: { label: '道路 (Roads)', type: 'polygon' },
     sidewalksMarked: { label: '標線型人行道 (Marked Sidewalks)', type: 'polygon' },
     sidewalksPhysical: { label: '實體人行道 (Physical Sidewalks)', type: 'polygon' },
     grid: { label: '步行分數網格 (Walkability Grid)', type: 'polygon', noColor: true },
     villages: { label: '里界 (Villages)', type: 'polygon', hasLabelToggle: true },
     districts: { label: '行政區界 (Districts)', type: 'polygon', hasLabelToggle: true },
-    mainPlan: { label: '主要計畫 (Main Plan)', type: 'polygon', noColor: true } // Add Main Plan config
+    districts: { label: '行政區界 (Districts)', type: 'polygon', hasLabelToggle: true },
+    mainPlan: { label: '主要計畫 (Main Plan)', type: 'polygon', noColor: true }, // Add Main Plan config
+    socialHousing: { label: '社會住宅-點位 (Social Housing Points)', type: 'point' }, // Add Social Housing config
+    socialHousingChoropleth: { label: '社會住宅-面量圖 (Social Housing Choropleth)', type: 'polygon', noColor: true } // Add Social Housing Choropleth config
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -131,6 +135,11 @@ function App() {
       const [reorderedItem] = items.splice(source.index, 1);
       items.splice(destination.index, 0, reorderedItem);
       setBlueGreenLayers(items);
+    } else if (listId === 'socialHousing') { // New Group Handler
+      const items = Array.from(socialHousingLayers);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+      setSocialHousingLayers(items);
     } else if (listId === 'infrastructure') {
       const items = Array.from(infrastructureLayers);
       const [reorderedItem] = items.splice(source.index, 1);
@@ -280,6 +289,68 @@ function App() {
     );
   };
 
+  // Fetch Social Housing Data
+  useEffect(() => {
+    const fetchSocialHousing = async () => {
+      try {
+        const response = await fetch('/api/BigData/project');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Convert to GeoJSON
+        const geojson = {
+          type: 'FeatureCollection',
+          features: data.map((item, index) => ({
+            type: 'Feature',
+            id: index,
+            geometry: {
+              type: 'Point',
+              coordinates: [parseFloat(item.lng), parseFloat(item.lat)]
+            },
+            properties: item
+          })).filter(feature => !isNaN(feature.geometry.coordinates[0]) && !isNaN(feature.geometry.coordinates[1]))
+        };
+
+        setSocialHousingData(geojson);
+        console.log('Social Housing Data Loaded:', geojson);
+      } catch (error) {
+        console.error('Error fetching social housing data:', error);
+      }
+    };
+
+    fetchSocialHousing();
+  }, []);
+
+  // Process Social Housing Data for Choropleth
+  const socialHousingChoroplethData = useMemo(() => {
+    const counts = {};
+    // Initialize counts for all districts (optional, but good practice)
+    districtData.features.forEach(feature => {
+      counts[feature.properties.TNAME] = 0;
+    });
+
+    socialHousingRawData.forEach(project => {
+      // Filter by status if not 'all'
+      if (socialHousingStatus !== 'all' && project.progress !== socialHousingStatus) {
+        return;
+      }
+
+      const district = project.distict; // Note: typo in JSON 'distict'
+      const households = parseInt(project.houseHolds) || 0;
+
+      if (counts[district] !== undefined) {
+        counts[district] += households;
+      } else {
+        // Handle potential district name mismatches or new districts
+        counts[district] = households;
+      }
+    });
+
+    return counts;
+  }, [socialHousingStatus]);
+
   // Memoize layers object to prevent unnecessary re-renders of Map component
   const layers = useMemo(() => ({
     grid: gridData,
@@ -296,8 +367,13 @@ function App() {
     natureProtection: natureProtectionData,
     roads: roadsData,
     sidewalksMarked: sidewalksMarkedData,
-    sidewalksPhysical: sidewalksPhysicalData
-  }), []);
+    roads: roadsData,
+    sidewalksMarked: sidewalksMarkedData,
+    sidewalksPhysical: sidewalksPhysicalData,
+    sidewalksPhysical: sidewalksPhysicalData,
+    socialHousing: socialHousingData, // Add social housing data
+    socialHousingChoroplethData: socialHousingChoroplethData // Pass aggregated data
+  }), [socialHousingData, socialHousingChoroplethData]);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', position: 'relative' }}>
@@ -434,6 +510,8 @@ function App() {
             </div>
           )}
         </form>
+
+
 
         {/* 評分模式選擇 */}
         <div style={{ background: '#2a2a2a', padding: '15px', borderRadius: '8px' }}>
@@ -790,6 +868,118 @@ function App() {
                                       />
                                       <span>顯示名稱 (Show Name)</span>
                                     </label>
+                                  )}
+
+                                  {!config.noColor && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span>Color:</span>
+                                      <input
+                                        type="color"
+                                        value={layerStyles[layerKey].color}
+                                        onChange={(e) => updateLayerStyle(layerKey, 'color', e.target.value)}
+                                        style={{ width: '40px', height: '24px', border: 'none', cursor: 'pointer' }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>Opacity:</span>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={layerStyles[layerKey].opacity}
+                                      onChange={(e) => updateLayerStyle(layerKey, 'opacity', parseFloat(e.target.value))}
+                                      style={{ flex: 1 }}
+                                    />
+                                    <span>{layerStyles[layerKey].opacity.toFixed(1)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+
+            {/* Social Housing Group (New) */}
+            <div style={{ marginBottom: '15px' }}>
+              <h3 style={{ fontSize: '12px', color: '#8e44ad', marginBottom: '8px', textTransform: 'uppercase' }}>社會住宅 (Social Housing)</h3>
+              <Droppable droppableId="socialHousing">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {socialHousingLayers.map((layerKey, index) => {
+                      const config = layerConfig[layerKey];
+                      return (
+                        <Draggable key={layerKey} draggableId={layerKey} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                background: '#1a1a1a',
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid #444'
+                              }}
+                            >
+                              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
+                                <span style={{ marginRight: '8px', cursor: 'grab' }}>☰</span>
+                                <input
+                                  type="checkbox"
+                                  checked={visibleLayers[layerKey]}
+                                  onChange={() => toggleLayer(layerKey)}
+                                  style={{ marginRight: '8px' }}
+                                />
+                                <strong>{config.label}</strong>
+                              </label>
+
+                              {visibleLayers[layerKey] && (
+                                <div style={{ marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+
+                                  {/* Special Controls for Social Housing Choropleth */}
+                                  {layerKey === 'socialHousingChoropleth' && (
+                                    <div style={{ marginBottom: '10px', padding: '10px', background: '#2a2a2a', borderRadius: '4px' }}>
+                                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#aaa' }}>狀態 (Status):</label>
+                                      <select
+                                        value={socialHousingStatus}
+                                        onChange={(e) => setSocialHousingStatus(e.target.value)}
+                                        style={{
+                                          width: '100%',
+                                          padding: '5px',
+                                          borderRadius: '4px',
+                                          background: '#1a1a1a',
+                                          color: '#fff',
+                                          border: '1px solid #444',
+                                          fontSize: '12px'
+                                        }}
+                                      >
+                                        <option value="all">全部 (All)</option>
+                                        <option value="已完工">已完工 (Completed)</option>
+                                        <option value="施工中及待開工">施工中及待開工 (Under Construction)</option>
+                                        <option value="招標中及待上網">招標中及待上網 (Tendering)</option>
+                                        <option value="規劃中">規劃中 (Planning)</option>
+                                        <option value="都更聯開分回">都更聯開分回 (Urban Renewal)</option>
+                                      </select>
+
+                                      <div style={{ marginTop: '10px' }}>
+                                        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '5px' }}>圖例 (Legend - 戶數):</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', flexWrap: 'wrap' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#f3e5f5', marginRight: '4px' }}></span>0</div>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#e1bee7', marginRight: '4px' }}></span>1-500</div>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#ce93d8', marginRight: '4px' }}></span>500-1000</div>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#ba68c8', marginRight: '4px' }}></span>1k-2k</div>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#8e24aa', marginRight: '4px' }}></span>{'>'}2k</div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   )}
 
                                   {!config.noColor && (

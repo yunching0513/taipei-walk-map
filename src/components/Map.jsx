@@ -39,72 +39,123 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
 
         const addLayers = () => {
             // --- 1. Districts (Polygon) ---
-            if (layers.districts && !map.current.getSource('districts')) {
-                map.current.addSource('districts', { type: 'geojson', data: layers.districts });
-                map.current.addLayer({
-                    id: 'districts-line',
-                    type: 'line',
-                    source: 'districts',
-                    layout: { visibility: visibleLayers.districts ? 'visible' : 'none' },
-                    paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.3 }
-                });
+            // --- 1. Districts (Polygon) ---
+            if (layers.districts) {
+                if (!map.current.getSource('districts')) {
+                    map.current.addSource('districts', { type: 'geojson', data: layers.districts });
+                }
+
+                if (!map.current.getLayer('districts-line')) {
+                    map.current.addLayer({
+                        id: 'districts-line',
+                        type: 'line',
+                        source: 'districts',
+                        layout: { visibility: visibleLayers.districts ? 'visible' : 'none' },
+                        paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.3 }
+                    });
+                }
+
+                // --- 1a. Social Housing Choropleth (Fill) ---
+                if (!map.current.getLayer('social-housing-choropleth')) {
+                    try {
+                        // Construct color expression
+                        const defaultColor = 'rgba(0,0,0,0)'; // Transparent for 0 or no data
+                        const choroplethExpression = ['match', ['get', 'TNAME']];
+
+                        const counts = layers.socialHousingChoroplethData || {};
+
+                        Object.entries(counts).forEach(([district, count]) => {
+                            let color = defaultColor;
+                            if (count > 2000) color = '#8e24aa';
+                            else if (count > 1000) color = '#ba68c8';
+                            else if (count > 500) color = '#ce93d8';
+                            else if (count > 0) color = '#e1bee7';
+
+                            if (count === 0) color = 'rgba(0,0,0,0)';
+
+                            choroplethExpression.push(district, color);
+                        });
+                        choroplethExpression.push(defaultColor); // Fallback
+
+                        const beforeId = map.current.getLayer('districts-line') ? 'districts-line' : undefined;
+
+                        map.current.addLayer({
+                            id: 'social-housing-choropleth',
+                            type: 'fill',
+                            source: 'districts', // Reuse districts source
+                            layout: { visibility: visibleLayers.socialHousingChoropleth ? 'visible' : 'none' },
+                            paint: {
+                                'fill-color': choroplethExpression,
+                                'fill-opacity': layerStyles.socialHousingChoropleth ? layerStyles.socialHousingChoropleth.opacity : 0.6
+                            }
+                        }, beforeId);
+                    } catch (e) {
+                        console.error('Error adding social-housing-choropleth layer:', e);
+                    }
+                }
 
                 // Add district name labels
-                console.log('Adding district labels layer');
-                map.current.addLayer({
-                    id: 'districts-labels',
-                    type: 'symbol',
-                    source: 'districts',
-                    layout: {
-                        'text-field': ['get', 'TNAME'],
-                        'text-font': ['Open Sans Bold'],
-                        'text-size': 12,
-                        'text-anchor': 'center',
-                        'text-allow-overlap': true,
-                        visibility: (visibleLayers.districts && showDistrictLabels) ? 'visible' : 'none'
-                    },
-                    paint: {
-                        'text-color': '#fff',
-                        'text-halo-color': '#000',
-                        'text-halo-width': 2
-                    }
-                });
+                if (!map.current.getLayer('districts-labels')) {
+                    console.log('Adding district labels layer');
+                    map.current.addLayer({
+                        id: 'districts-labels',
+                        type: 'symbol',
+                        source: 'districts',
+                        layout: {
+                            'text-field': ['get', 'TNAME'],
+                            'text-font': ['Open Sans Bold'],
+                            'text-size': 12,
+                            'text-anchor': 'center',
+                            'text-allow-overlap': true,
+                            visibility: (visibleLayers.districts && showDistrictLabels) ? 'visible' : 'none'
+                        },
+                        paint: {
+                            'text-color': '#fff',
+                            'text-halo-color': '#000',
+                            'text-halo-width': 2
+                        }
+                    });
+                }
             }
 
             // --- 1c. Main Plan (Polygon) ---
-            if (layers.mainPlan && !map.current.getSource('main-plan')) {
-                map.current.addSource('main-plan', { type: 'geojson', data: layers.mainPlan });
+            try {
+                if (layers.mainPlan && !map.current.getSource('main-plan')) {
+                    map.current.addSource('main-plan', { type: 'geojson', data: layers.mainPlan });
 
-                // Build color match expression from zoningColors
-                const colorMatchExpression = ['match', ['get', 'zone_type']];
-                if (zoningColors) {
-                    Object.entries(zoningColors).forEach(([zone, color]) => {
-                        colorMatchExpression.push(zone, color);
+                    // Build color match expression from zoningColors
+                    const colorMatchExpression = ['match', ['get', 'zone_type']];
+                    if (zoningColors) {
+                        Object.entries(zoningColors).forEach(([zone, color]) => {
+                            colorMatchExpression.push(zone, color);
+                        });
+                    }
+                    colorMatchExpression.push('#cccccc'); // Default color
+
+                    // console.log('Main Plan Color Expression:', colorMatchExpression.slice(0, 20)); // Log first 20 entries
+                    // console.log('Total zones with colors:', Object.keys(zoningColors || {}).length);
+
+                    // Build filter expression based on selectedMainPlanZones
+                    let filterExpression = null;
+                    if (selectedMainPlanZones && selectedMainPlanZones.length > 0) {
+                        filterExpression = ['in', ['get', 'zone_type'], ['literal', selectedMainPlanZones]];
+                    }
+
+                    map.current.addLayer({
+                        id: 'main-plan-fill',
+                        type: 'fill',
+                        source: 'main-plan',
+                        layout: { visibility: visibleLayers.mainPlan ? 'visible' : 'none' },
+                        ...(filterExpression ? { filter: filterExpression } : {}),
+                        paint: {
+                            'fill-color': colorMatchExpression,
+                            'fill-opacity': layerStyles.mainPlan ? layerStyles.mainPlan.opacity : 0.6,
+                            'fill-outline-color': '#000000'
+                        }
                     });
                 }
-                colorMatchExpression.push('#cccccc'); // Default color
-
-                console.log('Main Plan Color Expression:', colorMatchExpression.slice(0, 20)); // Log first 20 entries
-                console.log('Total zones with colors:', Object.keys(zoningColors || {}).length);
-
-                // Build filter expression based on selectedMainPlanZones
-                let filterExpression = null;
-                if (selectedMainPlanZones && selectedMainPlanZones.length > 0) {
-                    filterExpression = ['in', ['get', 'zone_type'], ['literal', selectedMainPlanZones]];
-                }
-
-                map.current.addLayer({
-                    id: 'main-plan-fill',
-                    type: 'fill',
-                    source: 'main-plan',
-                    layout: { visibility: visibleLayers.mainPlan ? 'visible' : 'none' },
-                    ...(filterExpression ? { filter: filterExpression } : {}),
-                    paint: {
-                        'fill-color': colorMatchExpression,
-                        'fill-opacity': layerStyles.mainPlan ? layerStyles.mainPlan.opacity : 0.6,
-                        'fill-outline-color': '#000000'
-                    }
-                });
+            } catch (error) {
+                console.error('Error adding Main Plan layer:', error);
             }
             // --- 1b. Villages (Polygon) ---
             if (layers.villages && !map.current.getSource('villages')) {
@@ -397,8 +448,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     source: 'parks',
                     layout: { visibility: visibleLayers.parks ? 'visible' : 'none' },
                     paint: {
-                        'fill-color': layerStyles.parks.color,
-                        'fill-opacity': layerStyles.parks.opacity
+                        'fill-color': layerStyles.ecoProtection.color,
+                        'fill-opacity': layerStyles.ecoProtection.opacity
                     }
                 });
             }
@@ -412,8 +463,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     source: 'agriculture',
                     layout: { visibility: visibleLayers.agriculture ? 'visible' : 'none' },
                     paint: {
-                        'fill-color': layerStyles.agriculture.color,
-                        'fill-opacity': layerStyles.agriculture.opacity
+                        'fill-color': layerStyles.ecoProtection.color,
+                        'fill-opacity': layerStyles.ecoProtection.opacity
                     }
                 });
             }
@@ -427,8 +478,8 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     source: 'bird-protection',
                     layout: { visibility: visibleLayers.birdProtection ? 'visible' : 'none' },
                     paint: {
-                        'fill-color': layerStyles.birdProtection.color,
-                        'fill-opacity': layerStyles.birdProtection.opacity
+                        'fill-color': layerStyles.ecoProtection.color,
+                        'fill-opacity': layerStyles.ecoProtection.opacity
                     }
                 });
             }
@@ -442,9 +493,60 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     source: 'nature-protection',
                     layout: { visibility: visibleLayers.natureProtection ? 'visible' : 'none' },
                     paint: {
-                        'fill-color': layerStyles.natureProtection.color,
-                        'fill-opacity': layerStyles.natureProtection.opacity
+                        'fill-color': layerStyles.ecoProtection.color,
+                        'fill-opacity': layerStyles.ecoProtection.opacity
                     }
+                });
+            }
+
+            // --- 13. Social Housing (Point) ---
+            if (layers.socialHousing && !map.current.getSource('social-housing')) {
+                map.current.addSource('social-housing', { type: 'geojson', data: layers.socialHousing });
+                map.current.addLayer({
+                    id: 'social-housing-layer',
+                    type: 'circle',
+                    source: 'social-housing',
+                    layout: { visibility: visibleLayers.socialHousing ? 'visible' : 'none' },
+                    paint: {
+                        'circle-radius': 3.5,
+                        'circle-color': layerStyles.socialHousing.color,
+                        'circle-opacity': layerStyles.socialHousing.opacity,
+                        'circle-stroke-width': 1,
+                        'circle-stroke-color': '#ffffff'
+                    }
+                });
+
+                // Click event for Social Housing
+                map.current.on('click', 'social-housing-layer', (e) => {
+                    if (e.features.length > 0) {
+                        const feature = e.features[0];
+                        const props = feature.properties;
+                        const coordinates = feature.geometry.coordinates.slice();
+
+                        const htmlContent = `
+                            <div style="font-family: 'Noto Sans TC', sans-serif; font-size: 12px; line-height: 1.5; color: #333;">
+                                <strong style="color: #8e44ad; font-size: 14px;">社會住宅 (Social Housing)</strong><br/>
+                                <strong>案名:</strong> ${props.name}<br/>
+                                <strong>行政區:</strong> ${props.distict}<br/>
+                                <strong>地址:</strong> ${props.address || 'N/A'}<br/>
+                                <strong>戶數:</strong> ${props.houseHolds}<br/>
+                                <strong>進度:</strong> ${props.progress}<br/>
+                            </div>
+                        `;
+
+                        new maplibregl.Popup()
+                            .setLngLat(coordinates)
+                            .setHTML(htmlContent)
+                            .addTo(map.current);
+                    }
+                });
+
+                // Change cursor on hover (Social Housing)
+                map.current.on('mouseenter', 'social-housing-layer', () => {
+                    map.current.getCanvas().style.cursor = 'pointer';
+                });
+                map.current.on('mouseleave', 'social-housing-layer', () => {
+                    map.current.getCanvas().style.cursor = '';
                 });
             }
 
@@ -517,7 +619,11 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             listenersBound.current = true;
         };
 
-        addLayers();
+        try {
+            addLayers();
+        } catch (e) {
+            console.error("CRITICAL ERROR IN MAP COMPONENT:", e);
+        }
     }, [isLoaded, layers, visibleLayers, layerStyles, scoringMode]);
 
     // Update Main Plan Filter
@@ -553,13 +659,16 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         setVisibility('mrt-stations-layer', visibleLayers.mrtStations);
         setVisibility('bus-stops-layer', visibleLayers.busStops);
         setVisibility('trees-layer', visibleLayers.trees);
-        setVisibility('parks-fill', visibleLayers.parks);
-        setVisibility('agriculture-fill', visibleLayers.agriculture);
-        setVisibility('bird-protection-fill', visibleLayers.birdProtection);
-        setVisibility('nature-protection-fill', visibleLayers.natureProtection);
+        setVisibility('parks-fill', visibleLayers.ecoProtection);
+        setVisibility('agriculture-fill', visibleLayers.ecoProtection);
+        setVisibility('bird-protection-fill', visibleLayers.ecoProtection);
+        setVisibility('nature-protection-fill', visibleLayers.ecoProtection);
         setVisibility('roads-fill', visibleLayers.roads);
         setVisibility('sidewalks-marked-fill', visibleLayers.sidewalksMarked);
         setVisibility('sidewalks-physical-fill', visibleLayers.sidewalksPhysical);
+        setVisibility('sidewalks-physical-fill', visibleLayers.sidewalksPhysical);
+        setVisibility('social-housing-layer', visibleLayers.socialHousing); // Add Social Housing visibility
+        setVisibility('social-housing-choropleth', visibleLayers.socialHousingChoropleth); // Add Social Housing Choropleth visibility
 
         // MapLibre draws layers in order, so the last one added is on top.
         // moveLayer(id, beforeId) moves 'id' before 'beforeId'.
@@ -575,10 +684,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             'mrtStations': ['mrt-stations-layer'],
             'busStops': ['bus-stops-layer'],
             'trees': ['trees-layer'],
-            'parks': ['parks-fill'],
-            'agriculture': ['agriculture-fill'],
-            'birdProtection': ['bird-protection-fill'],
-            'natureProtection': ['nature-protection-fill'],
+            'ecoProtection': ['parks-fill', 'agriculture-fill', 'bird-protection-fill', 'nature-protection-fill'],
             'mrtLines': ['mrt-lines-layer'],
             'roads': ['roads-fill'],
             'sidewalksMarked': ['sidewalks-marked-fill'],
@@ -586,7 +692,9 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             'grid': ['grid-fill'],
             'villages': ['villages-line'], // Add villages to layer map
             'districts': ['districts-line'],
-            'mainPlan': ['main-plan-fill']
+            'socialHousingChoropleth': ['social-housing-choropleth'], // Add to layer map
+            'mainPlan': ['main-plan-fill'],
+            'socialHousing': ['social-housing-layer'] // Add Social Housing to layer map
         };
 
         // Reverse iterate to stack from bottom to top
@@ -683,28 +791,15 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             map.current.setPaintProperty('trees-layer', 'circle-opacity', layerStyles.trees.opacity);
         }
 
-        // Parks
-        if (map.current.getLayer('parks-fill')) {
-            map.current.setPaintProperty('parks-fill', 'fill-color', layerStyles.parks.color);
-            map.current.setPaintProperty('parks-fill', 'fill-opacity', layerStyles.parks.opacity);
-        }
-
-        // Agriculture
-        if (map.current.getLayer('agriculture-fill')) {
-            map.current.setPaintProperty('agriculture-fill', 'fill-color', layerStyles.agriculture.color);
-            map.current.setPaintProperty('agriculture-fill', 'fill-opacity', layerStyles.agriculture.opacity);
-        }
-
-        // Bird Protection
-        if (map.current.getLayer('bird-protection-fill')) {
-            map.current.setPaintProperty('bird-protection-fill', 'fill-color', layerStyles.birdProtection.color);
-            map.current.setPaintProperty('bird-protection-fill', 'fill-opacity', layerStyles.birdProtection.opacity);
-        }
-
-        // Nature Protection
-        if (map.current.getLayer('nature-protection-fill')) {
-            map.current.setPaintProperty('nature-protection-fill', 'fill-color', layerStyles.natureProtection.color);
-            map.current.setPaintProperty('nature-protection-fill', 'fill-opacity', layerStyles.natureProtection.opacity);
+        // Eco Protection (Group)
+        const ecoLayerIds = ['parks-fill', 'agriculture-fill', 'bird-protection-fill', 'nature-protection-fill'];
+        if (layerStyles.ecoProtection) {
+            ecoLayerIds.forEach(id => {
+                if (map.current.getLayer(id)) {
+                    map.current.setPaintProperty(id, 'fill-color', layerStyles.ecoProtection.color);
+                    map.current.setPaintProperty(id, 'fill-opacity', layerStyles.ecoProtection.opacity);
+                }
+            });
         }
 
         // Roads
@@ -725,7 +820,39 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             map.current.setPaintProperty('sidewalks-physical-fill', 'fill-opacity', layerStyles.sidewalksPhysical.opacity);
         }
 
+        // Social Housing
+        if (map.current.getLayer('social-housing-layer')) {
+            map.current.setPaintProperty('social-housing-layer', 'circle-color', layerStyles.socialHousing.color);
+            map.current.setPaintProperty('social-housing-layer', 'circle-opacity', layerStyles.socialHousing.opacity);
+        }
+
     }, [layerStyles]);
+
+    // Update Social Housing Choropleth Colors when data changes
+    useEffect(() => {
+        if (!map.current || !isLoaded || !layers.socialHousingChoroplethData) return;
+
+        if (map.current.getLayer('social-housing-choropleth')) {
+            const defaultColor = 'rgba(0,0,0,0)';
+            const choroplethExpression = ['match', ['get', 'TNAME']];
+            const counts = layers.socialHousingChoroplethData || {};
+
+            Object.entries(counts).forEach(([district, count]) => {
+                let color = defaultColor;
+                if (count > 2000) color = '#8e24aa';
+                else if (count > 1000) color = '#ba68c8';
+                else if (count > 500) color = '#ce93d8';
+                else if (count > 0) color = '#e1bee7';
+
+                if (count === 0) color = 'rgba(0,0,0,0)';
+
+                choroplethExpression.push(district, color);
+            });
+            choroplethExpression.push(defaultColor);
+
+            map.current.setPaintProperty('social-housing-choropleth', 'fill-color', choroplethExpression);
+        }
+    }, [layers.socialHousingChoroplethData, isLoaded]);
 
     // Update Grid Color based on Scoring Mode
     useEffect(() => {
