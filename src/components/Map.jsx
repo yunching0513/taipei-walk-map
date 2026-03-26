@@ -110,7 +110,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                             visibility: (visibleLayers.districts && showDistrictLabels) ? 'visible' : 'none'
                         },
                         paint: {
-                            'text-color': '#fff',
+                            'text-color': 'var(--color-text)',
                             'text-halo-color': '#000',
                             'text-halo-width': 2
                         }
@@ -183,7 +183,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     },
                     paint: {
                         'text-color': '#eee',
-                        'text-halo-color': '#333',
+                        'text-halo-color': 'var(--color-bg)',
                         'text-halo-width': 1
                     }
                 });
@@ -1122,7 +1122,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 2000,
-                    color: '#fff',
+                    color: 'var(--color-text)',
                     backdropFilter: 'blur(4px)'
                 }}>
                     <div style={{
@@ -1137,7 +1137,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                     <div style={{ fontSize: '16px', fontWeight: '500', letterSpacing: '1px' }}>
                         載入地圖資料中...
                     </div>
-                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '8px' }}>
                         Loading Map Data...
                     </div>
                     <style>{`
