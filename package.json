@@ -17,6 +17,7 @@
     "leaflet": "^1.9.4",
     "maplibre-gl": "^5.13.0",
     "postcss": "^8.5.6",
+    "proj4": "^2.20.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-leaflet": "^5.0.0",

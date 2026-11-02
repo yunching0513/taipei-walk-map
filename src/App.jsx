@@ -61,13 +61,13 @@ function App() {
     villages: { color: '#cccccc', opacity: 0.4 },
     mainPlan: { opacity: 0.6 }, // Add Main Plan style
     mrtLines: { opacity: 1 },
-    mrtStations: { color: '#e74c3c', opacity: 1.0 },
-    busStops: { color: '#f39c12', opacity: 0.8 },
-    trees: { color: '#27ae60', opacity: 0.8 },
-    ecoProtection: { color: '#4caf50', opacity: 0.6 }, // Group style
-    roads: { color: '#ffffff', opacity: 1.0 },
-    sidewalksMarked: { color: '#2ecc71', opacity: 1.0 },
-    sidewalksPhysical: { color: '#3498db', opacity: 0.5 },
+    mrtStations: { color: '#e53935', opacity: 1.0 },
+    busStops: { color: '#ffb300', opacity: 0.8 },
+    trees: { color: '#7cb342', opacity: 0.85 },
+    ecoProtection: { color: '#8bc34a', opacity: 0.5 }, // Group style
+    roads: { color: '#ffffff', opacity: 0.9 },
+    sidewalksMarked: { color: '#aed581', opacity: 1.0 },
+    sidewalksPhysical: { color: '#ffa726', opacity: 0.8 },
     smallRoads: { color: '#95a5a6', opacity: 0.6 }, // Add Small Roads style
     socialHousing: { color: '#f7e18bff', opacity: 0.8 }, // Add Social Housing style
     socialHousingChoropleth: { opacity: 0.6 } // Add Social Housing Choropleth style
@@ -98,7 +98,6 @@ function App() {
     sidewalksPhysical: { label: '實體人行道 (Physical Sidewalks)', type: 'polygon' },
     grid: { label: '步行分數網格 (Walkability Grid)', type: 'polygon', noColor: true },
     villages: { label: '里界 (Villages)', type: 'polygon', hasLabelToggle: true },
-    districts: { label: '行政區界 (Districts)', type: 'polygon', hasLabelToggle: true },
     districts: { label: '行政區界 (Districts)', type: 'polygon', hasLabelToggle: true },
     mainPlan: { label: '主要計畫 (Main Plan)', type: 'polygon', noColor: true }, // Add Main Plan config
     socialHousing: { label: '社會住宅-點位 (Social Housing Points)', type: 'point' }, // Add Social Housing config
@@ -246,7 +245,7 @@ function App() {
   ];
 
   // 底圖選擇
-  const [selectedBasemap, setSelectedBasemap] = useState('dark'); // default: dark
+  const [selectedBasemap, setSelectedBasemap] = useState('light'); // default: light
 
   const basemaps = {
     dark: {
@@ -371,8 +370,6 @@ function App() {
     natureProtection: natureProtectionData,
     roads: roadsData,
     sidewalksMarked: sidewalksMarkedData,
-    roads: roadsData,
-    sidewalksMarked: sidewalksMarkedData,
     sidewalksPhysical: sidewalksPhysicalData,
     smallRoads: smallRoadsData, // Add small roads data
     socialHousing: socialHousingData, // Add social housing data
@@ -389,10 +386,10 @@ function App() {
           top: '10px',
           left: '10px',
           zIndex: 1001,
-          background: '#1a1a1a',
-          color: '#fff',
-          border: '1px solid #444',
-          borderRadius: '4px',
+          background: 'var(--color-sidebar)',
+          color: 'var(--color-text)',
+          border: '2px solid var(--color-bg)',
+          borderRadius: 'var(--radius-md)',
           padding: '10px 12px',
           cursor: 'pointer',
           fontSize: '18px',
@@ -407,8 +404,8 @@ function App() {
       <div
         style={{
           width: '400px',
-          background: '#1a1a1a',
-          color: '#fff',
+          background: 'var(--color-sidebar)',
+          color: 'var(--color-text)',
           overflowY: 'auto',
           padding: '20px',
           boxShadow: '2px 0 10px rgba(0,0,0,0.5)',
@@ -420,11 +417,11 @@ function App() {
         className={isSidebarOpen ? 'sidebar sidebar-open' : 'sidebar sidebar-closed'}
       >
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: "'Noto Sans TC', sans-serif" }}>
+          <h1 style={{ fontSize: '28px', fontWeight: '900', color: 'var(--color-primary)' }}>
             Taipei Walk Map
           </h1>
-          <p style={{ color: '#888', fontSize: '14px', fontWeight: '200', fontFamily: "'Noto Sans TC', sans-serif", marginTop: '4px' }}>
-            Exploring urban accessibility.
+          <p style={{ color: 'var(--color-text-light)', fontSize: '15px', fontWeight: '700', marginTop: '4px' }}>
+            🌿 探索城市步行友善度
           </p>
           <p style={{ color: '#666', fontSize: '18px', fontWeight: '200', fontFamily: "'Noto Sans TC', sans-serif", marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>Created by Yun-Ching Wu（吳昀慶）</span>
@@ -440,13 +437,13 @@ function App() {
                 height: '22px',
                 background: '#000',
                 borderRadius: '50%',
-                color: '#fff',
+                color: 'var(--color-text)',
                 fontSize: '11px',
                 fontWeight: 'bold',
                 textDecoration: 'none',
                 transition: 'background 0.2s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
               onMouseLeave={(e) => e.currentTarget.style.background = '#000'}
               title="LinkedIn Profile"
             >
@@ -466,10 +463,10 @@ function App() {
               style={{
                 flex: 1,
                 padding: '10px',
-                borderRadius: '4px',
-                border: '1px solid #444',
-                background: '#2a2a2a',
-                color: '#fff',
+                borderRadius: 'var(--radius-md)',
+                border: '2px solid var(--color-bg)',
+                background: 'var(--color-bg)',
+                color: 'var(--color-text)',
                 fontSize: '14px'
               }}
             />
@@ -479,23 +476,23 @@ function App() {
               disabled={isLocating}
               style={{
                 padding: '10px 12px',
-                borderRadius: '4px',
-                border: '1px solid #444',
-                background: isLocating ? '#555' : '#2a2a2a',
-                color: '#fff',
+                borderRadius: 'var(--radius-md)',
+                border: '2px solid var(--color-bg)',
+                background: isLocating ? 'var(--color-sidebar)' : 'var(--color-bg)',
+                color: 'var(--color-text)',
                 cursor: isLocating ? 'wait' : 'pointer',
                 fontSize: '18px',
                 transition: 'background 0.2s'
               }}
               onMouseEnter={(e) => !isLocating && (e.currentTarget.style.background = '#3a3a3a')}
-              onMouseLeave={(e) => !isLocating && (e.currentTarget.style.background = '#2a2a2a')}
+              onMouseLeave={(e) => !isLocating && (e.currentTarget.style.background = 'var(--color-bg)')}
               title="定位我的位置"
             >
               {isLocating ? '⏳' : '📍'}
             </button>
           </div>
           {searchLocation && (
-            <div style={{ marginTop: '5px', fontSize: '12px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ marginTop: '5px', fontSize: '12px', color: 'var(--color-text-light)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               📍 {searchLocation.name}
               <button
                 type="button"
@@ -518,13 +515,13 @@ function App() {
 
 
         {/* 評分模式選擇 */}
-        <div style={{ background: '#2a2a2a', padding: '15px', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#f1c40f' }}>
-            Scoring Mode
+        <div className="bouncy" style={{ background: 'var(--color-bg)', padding: '15px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)' }}>
+          <h2 style={{ fontSize: '18px', marginBottom: '15px', color: 'var(--color-primary)', fontWeight: '800' }}>
+            🌸 Scoring Mode
           </h2>
 
           {/* Grid Visibility Toggle (Moved to top) */}
-          <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #444' }}>
+          <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '2px solid var(--color-bg)' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -535,7 +532,7 @@ function App() {
               <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ddd' }}>顯示步行分數網格 (Show Grid)</span>
             </label>
             {visibleLayers.grid && (
-              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#aaa' }}>
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-light)' }}>
                 <span>Opacity:</span>
                 <input
                   type="range"
@@ -553,7 +550,7 @@ function App() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {scoringModes.map(mode => (
-              <label key={mode.id} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '8px', background: scoringMode === mode.id ? '#444' : 'transparent', borderRadius: '4px' }}>
+              <label key={mode.id} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '8px', background: scoringMode === mode.id ? 'var(--color-sidebar)' : 'transparent', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input
                     type="radio"
@@ -564,7 +561,7 @@ function App() {
                   />
                   <div>
                     <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{mode.label}</div>
-                    <div style={{ fontSize: '12px', color: '#aaa' }}>{mode.desc}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>{mode.desc}</div>
                     {scoringMode === mode.id && (
                       <div style={{ fontSize: '11px', color: '#f1c40f', marginTop: '4px' }}>
                         {mode.details}
@@ -581,13 +578,13 @@ function App() {
 
         {/* 上傳的圖層管理 */}
         {uploadedLayers.length > 0 && (
-          <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
+          <div style={{ padding: '15px', background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: 'var(--color-text-light)', marginBottom: '10px' }}>
               Uploaded Layers ({uploadedLayers.length})
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {uploadedLayers.map(layer => (
-                <div key={layer.id} style={{ padding: '10px', background: '#1a1a1a', borderRadius: '4px' }}>
+                <div key={layer.id} style={{ padding: '10px', background: 'var(--color-sidebar)', borderRadius: 'var(--radius-md)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}>
                       <input
@@ -603,8 +600,8 @@ function App() {
                       style={{
                         background: '#e74c3c',
                         border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--color-text)',
                         padding: '4px 8px',
                         cursor: 'pointer',
                         fontSize: '11px'
@@ -646,9 +643,9 @@ function App() {
         )}
 
         {/* 圖層控制區 (Drag & Drop) */}
-        <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
-            Layers (Drag to Reorder)
+        <div style={{ padding: '15px', background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--color-primary)', marginBottom: '12px' }}>
+            🌱 Layers (Drag to Reorder)
           </h2>
           <DragDropContext onDragEnd={onDragEnd}>
 
@@ -669,10 +666,11 @@ function App() {
                               {...provided.dragHandleProps}
                               style={{
                                 ...provided.draggableProps.style,
-                                background: '#1a1a1a',
-                                padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
+                                background: '#ffffff',
+                                padding: '12px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '2px solid #e0ebd3',
+                                boxShadow: 'var(--shadow-soft)'
                               }}
                             >
                               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
@@ -755,10 +753,10 @@ function App() {
                               {...provided.dragHandleProps}
                               style={{
                                 ...provided.draggableProps.style,
-                                background: '#1a1a1a',
+                                background: 'var(--color-sidebar)',
                                 padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
+                                borderRadius: 'var(--radius-md)',
+                                border: '2px solid var(--color-bg)'
                               }}
                             >
 
@@ -842,10 +840,10 @@ function App() {
                               {...provided.dragHandleProps}
                               style={{
                                 ...provided.draggableProps.style,
-                                background: '#1a1a1a',
+                                background: 'var(--color-sidebar)',
                                 padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
+                                borderRadius: 'var(--radius-md)',
+                                border: '2px solid var(--color-bg)'
                               }}
                             >
                               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
@@ -928,10 +926,10 @@ function App() {
                               {...provided.dragHandleProps}
                               style={{
                                 ...provided.draggableProps.style,
-                                background: '#1a1a1a',
+                                background: 'var(--color-sidebar)',
                                 padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
+                                borderRadius: 'var(--radius-md)',
+                                border: '2px solid var(--color-bg)'
                               }}
                             >
                               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
@@ -950,18 +948,18 @@ function App() {
 
                                   {/* Special Controls for Social Housing Choropleth */}
                                   {layerKey === 'socialHousingChoropleth' && (
-                                    <div style={{ marginBottom: '10px', padding: '10px', background: '#2a2a2a', borderRadius: '4px' }}>
-                                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#aaa' }}>狀態 (Status):</label>
+                                    <div style={{ marginBottom: '10px', padding: '10px', background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
+                                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: 'var(--color-text-light)' }}>狀態 (Status):</label>
                                       <select
                                         value={socialHousingStatus}
                                         onChange={(e) => setSocialHousingStatus(e.target.value)}
                                         style={{
                                           width: '100%',
                                           padding: '5px',
-                                          borderRadius: '4px',
-                                          background: '#1a1a1a',
-                                          color: '#fff',
-                                          border: '1px solid #444',
+                                          borderRadius: 'var(--radius-md)',
+                                          background: 'var(--color-sidebar)',
+                                          color: 'var(--color-text)',
+                                          border: '2px solid var(--color-bg)',
                                           fontSize: '12px'
                                         }}
                                       >
@@ -974,7 +972,7 @@ function App() {
                                       </select>
 
                                       <div style={{ marginTop: '10px' }}>
-                                        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '5px' }}>圖例 (Legend - 戶數):</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--color-text-light)', marginBottom: '5px' }}>圖例 (Legend - 戶數):</div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', flexWrap: 'wrap' }}>
                                           <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#f3e5f5', marginRight: '4px' }}></span>0</div>
                                           <div style={{ display: 'flex', alignItems: 'center' }}><span style={{ width: '8px', height: '8px', background: '#e1bee7', marginRight: '4px' }}></span>1-500</div>
@@ -1042,10 +1040,10 @@ function App() {
                               {...provided.dragHandleProps}
                               style={{
                                 ...provided.draggableProps.style,
-                                background: '#1a1a1a',
+                                background: 'var(--color-sidebar)',
                                 padding: '10px',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
+                                borderRadius: 'var(--radius-md)',
+                                border: '2px solid var(--color-bg)'
                               }}
                             >
                               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
@@ -1078,7 +1076,7 @@ function App() {
                                   {layerKey === 'mainPlan' && zoningColors && (
                                     <div style={{ marginBottom: '8px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                        <label style={{ fontSize: '11px', color: '#aaa' }}>
+                                        <label style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
                                           過濾分區 (Filter Zones) {selectedMainPlanZones.length > 0 && `(${selectedMainPlanZones.length})`}
                                         </label>
                                         {selectedMainPlanZones.length > 0 && (
@@ -1086,10 +1084,10 @@ function App() {
                                             onClick={() => setSelectedMainPlanZones([])}
                                             style={{
                                               padding: '2px 6px',
-                                              background: '#555',
+                                              background: 'var(--color-sidebar)',
                                               border: 'none',
                                               borderRadius: '3px',
-                                              color: '#fff',
+                                              color: 'var(--color-text)',
                                               cursor: 'pointer',
                                               fontSize: '9px'
                                             }}
@@ -1101,9 +1099,9 @@ function App() {
                                       <div style={{
                                         maxHeight: '400px',
                                         overflowY: 'auto',
-                                        background: '#2a2a2a',
+                                        background: 'var(--color-bg)',
                                         border: '1px solid #555',
-                                        borderRadius: '4px',
+                                        borderRadius: 'var(--radius-md)',
                                         padding: '6px'
                                       }}>
                                         {zoneCategories.categories.map((category) => {
@@ -1128,10 +1126,10 @@ function App() {
                                                   cursor: 'pointer',
                                                   marginBottom: isExpanded ? '4px' : '0'
                                                 }}
-                                                onMouseEnter={(e) => e.currentTarget.style.background = '#444'}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-sidebar)'}
                                                 onMouseLeave={(e) => e.currentTarget.style.background = '#3a3a3a'}
                                               >
-                                                <span style={{ marginRight: '6px', fontSize: '10px', color: '#aaa' }}>
+                                                <span style={{ marginRight: '6px', fontSize: '10px', color: 'var(--color-text-light)' }}>
                                                   {isExpanded ? '▼' : '▶'}
                                                 </span>
                                                 <span
@@ -1144,13 +1142,13 @@ function App() {
                                                     flexShrink: 0
                                                   }}
                                                 />
-                                                <span style={{ flex: 1, fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>
+                                                <span style={{ flex: 1, fontSize: '11px', color: 'var(--color-text)', fontWeight: 'bold' }}>
                                                   {category.category}
                                                 </span>
-                                                <span style={{ fontSize: '9px', color: '#888', marginRight: '8px' }}>
+                                                <span style={{ fontSize: '9px', color: 'var(--color-text-light)', marginRight: '8px' }}>
                                                   {selectedInCategory > 0 ? `${selectedInCategory}/` : ''}{category.zones.length}
                                                 </span>
-                                                <span style={{ fontSize: '9px', color: '#888' }}>
+                                                <span style={{ fontSize: '9px', color: 'var(--color-text-light)' }}>
                                                   ({category.total_count})
                                                 </span>
                                               </div>
@@ -1169,13 +1167,13 @@ function App() {
                                                           alignItems: 'center',
                                                           padding: '4px 2px',
                                                           cursor: 'pointer',
-                                                          background: isSelected ? '#333' : 'transparent',
+                                                          background: isSelected ? 'var(--color-bg)' : 'transparent',
                                                           borderRadius: '3px',
                                                           marginBottom: '2px',
                                                           fontSize: '10px'
                                                         }}
                                                         onMouseEnter={(e) => e.currentTarget.style.background = isSelected ? '#3a3a3a' : '#2d2d2d'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? '#333' : 'transparent'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? 'var(--color-bg)' : 'transparent'}
                                                       >
                                                         <input
                                                           type="checkbox"
@@ -1199,7 +1197,7 @@ function App() {
                                                             flexShrink: 0
                                                           }}
                                                         />
-                                                        <span style={{ flex: 1, color: '#ccc' }}>{zone}</span>
+                                                        <span style={{ flex: 1, color: 'var(--color-text)' }}>{zone}</span>
                                                         <span style={{ color: '#777', fontSize: '9px', marginLeft: '4px' }}>({count})</span>
                                                       </label>
                                                     );
@@ -1254,9 +1252,9 @@ function App() {
         </div>
 
         {/* 底圖選擇 (Basemap Selection) */}
-        <div style={{ background: '#2a2a2a', padding: '15px', borderRadius: '8px' }}>
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#888', marginBottom: '12px' }}>
-            底圖 (Basemap)
+        <div className="bouncy" style={{ background: 'var(--color-bg)', padding: '15px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)', marginBottom: '15px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--color-primary)', marginBottom: '12px' }}>
+            🗺️ 底圖 (Basemap)
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1266,8 +1264,8 @@ function App() {
                 alignItems: 'center',
                 cursor: 'pointer',
                 padding: '8px',
-                background: selectedBasemap === basemap.id ? '#444' : 'transparent',
-                borderRadius: '4px',
+                background: selectedBasemap === basemap.id ? 'var(--color-sidebar)' : 'transparent',
+                borderRadius: 'var(--radius-md)',
                 transition: 'background 0.2s'
               }}>
                 <input
@@ -1282,7 +1280,7 @@ function App() {
             ))}
           </div>
 
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '2px solid var(--color-bg)' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -1290,7 +1288,7 @@ function App() {
                 onChange={() => setShowMapLabels(!showMapLabels)}
                 style={{ marginRight: '8px', cursor: 'pointer' }}
               />
-              <span style={{ fontSize: '13px', color: '#ccc' }}>顯示地圖資訊 (Show Map Info)</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-text)' }}>顯示地圖資訊 (Show Map Info)</span>
             </label>
           </div>
         </div>
@@ -1300,13 +1298,13 @@ function App() {
 
         {/* 上傳的圖層管理 (Moved to bottom) */}
         {uploadedLayers.length > 0 && (
-          <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
-              Uploaded Layers ({uploadedLayers.length})
+          <div className="bouncy" style={{ padding: '15px', background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--color-primary)', marginBottom: '10px' }}>
+              📁 Uploaded Layers ({uploadedLayers.length})
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {uploadedLayers.map(layer => (
-                <div key={layer.id} style={{ padding: '10px', background: '#1a1a1a', borderRadius: '4px' }}>
+                <div key={layer.id} style={{ padding: '10px', background: 'var(--color-sidebar)', borderRadius: 'var(--radius-md)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}>
                       <input
@@ -1322,8 +1320,8 @@ function App() {
                       style={{
                         background: '#e74c3c',
                         border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--color-text)',
                         padding: '4px 8px',
                         cursor: 'pointer',
                         fontSize: '11px'
@@ -1405,7 +1403,7 @@ function App() {
           height: '56px',
           borderRadius: '50%',
           background: '#000',
-          color: '#fff',
+          color: 'var(--color-text)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1418,7 +1416,7 @@ function App() {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.1)';
-          e.currentTarget.style.background = '#333';
+          e.currentTarget.style.background = 'var(--color-bg)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'scale(1)';
@@ -1434,33 +1432,33 @@ function App() {
         top: '20px',
         right: '20px',
         width: '320px',
-        background: '#1a1a1a',
-        borderRadius: '8px',
+        background: 'var(--color-sidebar)',
+        borderRadius: 'var(--radius-lg)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.7)',
         zIndex: 1000,
         overflow: 'hidden',
-        border: '1px solid #444'
+        border: '2px solid var(--color-bg)'
       }}>
         {/* Header with collapse button */}
         <div
           onClick={() => setIsSelectionOpen(!isSelectionOpen)}
           style={{
             padding: '12px 15px',
-            background: '#2a2a2a',
+            background: 'var(--color-bg)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: isSelectionOpen ? '1px solid #444' : 'none',
+            borderBottom: isSelectionOpen ? '2px solid var(--color-bg)' : 'none',
             transition: 'background 0.2s'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
-          onMouseLeave={(e) => e.currentTarget.style.background = '#2a2a2a'}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
         >
-          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', margin: 0 }}>
+          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: 'var(--color-text-light)', margin: 0 }}>
             Selection
           </h2>
-          <span style={{ fontSize: '18px', color: '#aaa', transition: 'transform 0.3s', transform: isSelectionOpen ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+          <span style={{ fontSize: '18px', color: 'var(--color-text-light)', transition: 'transform 0.3s', transform: isSelectionOpen ? 'rotate(0deg)' : 'rotate(180deg)' }}>
             ▲
           </span>
         </div>
@@ -1469,7 +1467,7 @@ function App() {
         {isSelectionOpen && (
           <div style={{ padding: '15px' }}>
             {selectedFeature ? (
-              <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#fff' }}>
+              <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--color-text)' }}>
                 {selectedFeature.type === 'tree' ? (
                   <>
                     <p>Type: <b style={{ color: selectedFeature.type === 'protected' ? '#f1c40f' : '#2ecc71' }}>
@@ -1487,10 +1485,10 @@ function App() {
                     <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#f1c40f' }}>
                       {selectedFeature[`score_${scoringMode}`] || selectedFeature.score} <span style={{ fontSize: '14px' }}>/ 10</span>
                     </div>
-                    <p style={{ color: '#aaa', fontSize: '12px', marginBottom: '10px' }}>
+                    <p style={{ color: 'var(--color-text-light)', fontSize: '12px', marginBottom: '10px' }}>
                       {scoringModes.find(m => m.id === scoringMode)?.label}
                     </p>
-                    <hr style={{ borderColor: '#444', margin: '15px 0' }} />
+                    <hr style={{ borderColor: 'var(--color-sidebar)', margin: '15px 0' }} />
                     <p>MRT Dist: <b>{selectedFeature.dist_mrt} m</b></p>
                     <p>Bus Dist: <b>{selectedFeature.dist_bus} m</b></p>
                     <p>Trees: <b>{selectedFeature.tree_count || 0}</b></p>

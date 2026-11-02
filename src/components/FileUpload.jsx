@@ -1,5 +1,39 @@
 import { useState, useRef } from 'react';
 import shp from 'shpjs';
+import proj4 from 'proj4';
+
+// Define TWD97 (EPSG:3826)
+proj4.defs('EPSG:3826', '+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+const reprojectCoordinates = (coords) => {
+    if (!Array.isArray(coords)) return coords;
+    
+    // Base case: [x, y] or [x, y, z]
+    if (typeof coords[0] === 'number') {
+        // If x is wildly out of WGS84 bounds (e.g. > 180 or < -180), treat as TWD97
+        if (Math.abs(coords[0]) > 180) {
+            const [x, y] = proj4('EPSG:3826', 'EPSG:4326', [coords[0], coords[1]]);
+            return coords.length === 3 ? [x, y, coords[2]] : [x, y];
+        }
+        return coords;
+    }
+    
+    // Recursive case
+    return coords.map(c => reprojectCoordinates(c));
+};
+
+const autoReprojectFeatureCollection = (featureCollection) => {
+    return {
+        ...featureCollection,
+        features: featureCollection.features.map(feature => ({
+            ...feature,
+            geometry: feature.geometry ? {
+                ...feature.geometry,
+                coordinates: reprojectCoordinates(feature.geometry.coordinates)
+            } : null
+        }))
+    };
+};
 
 export default function FileUpload({ onLayerAdd }) {
     const [isDragging, setIsDragging] = useState(false);
@@ -56,15 +90,26 @@ export default function FileUpload({ onLayerAdd }) {
 
     const processGeoJSON = async (file) => {
         const text = await file.text();
-        const geojson = JSON.parse(text);
+        let geojson = JSON.parse(text);
+
+        // Normalize to FeatureCollection
+        if (geojson.type === 'Feature') {
+            geojson = { type: 'FeatureCollection', features: [geojson] };
+        } else if (geojson.type !== 'FeatureCollection') {
+            // Assume it's a raw geometry
+            geojson = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: geojson, properties: {} }] };
+        }
 
         const layerName = file.name.replace(/\.(geo)?json$/i, '');
         const color = getRandomColor();
 
+        // Auto reproject if needed
+        const finalData = autoReprojectFeatureCollection(geojson);
+
         onLayerAdd({
             id: Date.now() + Math.random(),
             name: layerName,
-            data: geojson,
+            data: finalData,
             color: color,
             opacity: 0.7,
             visible: true
@@ -77,46 +122,51 @@ export default function FileUpload({ onLayerAdd }) {
 
         for (const file of files) {
             const ext = file.name.split('.').pop().toLowerCase();
-            if (['shp', 'dbf', 'shx', 'prj', 'cpg'].includes(ext)) {
+            if (['shp', 'dbf', 'shx', 'prj', 'cpg', 'zip'].includes(ext)) {
                 fileMap[ext] = await file.arrayBuffer();
             }
         }
 
-        if (!fileMap.shp) {
-            throw new Error('找不到 .shp 檔案');
+        let geojsonResult;
+        
+        if (fileMap.zip) {
+            geojsonResult = await shp(fileMap.zip);
+        } else if (fileMap.shp) {
+            geojsonResult = await shp({ 
+                shp: fileMap.shp, 
+                dbf: fileMap.dbf, 
+                prj: fileMap.prj ? new TextDecoder().decode(fileMap.prj) : undefined 
+            });
+        } else {
+            throw new Error('找不到 .shp 或 .zip 檔案 (Missing .shp or .zip file)');
         }
 
-        // Parse shapefile using shpjs
-        const geojson = await shp.parseShp(fileMap.shp, fileMap.prj);
+        const geojsons = Array.isArray(geojsonResult) ? geojsonResult : [geojsonResult];
 
-        // If DBF exists, combine with geometries
-        let features = geojson;
-        if (fileMap.dbf) {
-            const dbfData = await shp.parseDbf(fileMap.dbf);
-            features = geojson.map((geometry, i) => ({
-                type: 'Feature',
-                geometry: geometry,
-                properties: dbfData[i] || {}
-            }));
+        for (const geojson of geojsons) {
+            // Auto reproject if needed
+            const finalData = autoReprojectFeatureCollection(geojson);
+
+            let layerName = 'Uploaded Layer';
+            if (geojson.fileName) layerName = geojson.fileName;
+            else {
+                const shpFile = files.find(f => f.name.endsWith('.shp') || f.name.endsWith('.zip'));
+                if (shpFile) {
+                    layerName = shpFile.name.replace(/\.(shp|zip)$/i, '');
+                }
+            }
+
+            const color = getRandomColor();
+
+            onLayerAdd({
+                id: Date.now() + Math.random(),
+                name: layerName,
+                data: finalData,
+                color: color,
+                opacity: 0.7,
+                visible: true
+            });
         }
-
-        const featureCollection = {
-            type: 'FeatureCollection',
-            features: Array.isArray(features) ? features : [features]
-        };
-
-        const shpFile = files.find(f => f.name.endsWith('.shp'));
-        const layerName = shpFile.name.replace(/\.shp$/i, '');
-        const color = getRandomColor();
-
-        onLayerAdd({
-            id: Date.now() + Math.random(),
-            name: layerName,
-            data: featureCollection,
-            color: color,
-            opacity: 0.7,
-            visible: true
-        });
     };
 
     const getRandomColor = () => {
@@ -129,8 +179,8 @@ export default function FileUpload({ onLayerAdd }) {
     };
 
     return (
-        <div style={{ padding: '15px', background: '#333', borderRadius: '8px' }}>
-            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#aaa', marginBottom: '10px' }}>
+        <div style={{ padding: '15px', background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '14px', textTransform: 'uppercase', color: 'var(--color-text-light)', marginBottom: '10px' }}>
                 Upload Layer
             </h2>
 
@@ -140,12 +190,12 @@ export default function FileUpload({ onLayerAdd }) {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                    border: `2px dashed ${isDragging ? '#f1c40f' : '#555'}`,
-                    borderRadius: '8px',
+                    border: `2px dashed ${isDragging ? '#f1c40f' : 'var(--color-sidebar)'}`,
+                    borderRadius: 'var(--radius-lg)',
                     padding: '20px',
                     textAlign: 'center',
                     cursor: 'pointer',
-                    background: isDragging ? 'rgba(241, 196, 15, 0.1)' : '#1a1a1a',
+                    background: isDragging ? 'rgba(241, 196, 15, 0.1)' : 'var(--color-sidebar)',
                     transition: 'all 0.3s'
                 }}
             >
@@ -162,7 +212,7 @@ export default function FileUpload({ onLayerAdd }) {
                     <p style={{ color: '#f1c40f', fontSize: '14px' }}>處理中...</p>
                 ) : (
                     <>
-                        <p style={{ fontSize: '14px', color: '#aaa', marginBottom: '8px' }}>
+                        <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginBottom: '8px' }}>
                             📁 拖曳檔案至此或點擊上傳
                         </p>
                         <p style={{ fontSize: '12px', color: '#666' }}>
