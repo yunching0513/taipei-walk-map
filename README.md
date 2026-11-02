@@ -29,3 +29,11 @@ Taipei Walk Map 是一個專注於台北市步行友善度分析的互動式地�
 ## 聯絡
 
 如有任何建議或回饋，歡迎透過 [jtl0513@gmail.com](mailto:jtl0513@gmail.com) 聯繫。
+
+
+---
+
+## 著作權 Copyright
+
+© 2025–2026　吳昀慶 Yun-Ching Wu
+授權條款見 [`LICENSE`](LICENSE) 與 [`LICENSE-CONTENT`](LICENSE-CONTENT)　詳細聲明見 [`COPYRIGHT.md`](COPYRIGHT.md)
