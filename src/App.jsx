@@ -25,6 +25,7 @@ import agricultureData from './data/taipei_agriculture.json';
 import birdProtectionData from './data/taipei_bird_protection.json';
 import natureProtectionData from './data/taipei_nature_protection.json';
 import socialHousingRawData from './data/taipei_social_housing.json'; // Import local social housing data
+import smallRoadsData from './data/taipei_small_roads.json'; // Import Small Roads (8m below)
 
 function App() {
   const [selectedFeature, setSelectedFeature] = useState(null);
@@ -48,6 +49,7 @@ function App() {
     roads: false,
     sidewalksMarked: false,
     sidewalksPhysical: false,
+    smallRoads: false, // Add Small Roads
     socialHousing: false, // Add Social Housing (Points)
     socialHousingChoropleth: false // Add Social Housing (Choropleth)
   });
@@ -66,6 +68,7 @@ function App() {
     roads: { color: '#ffffff', opacity: 1.0 },
     sidewalksMarked: { color: '#2ecc71', opacity: 1.0 },
     sidewalksPhysical: { color: '#3498db', opacity: 0.5 },
+    smallRoads: { color: '#95a5a6', opacity: 0.6 }, // Add Small Roads style
     socialHousing: { color: '#f7e18bff', opacity: 0.8 }, // Add Social Housing style
     socialHousingChoropleth: { opacity: 0.6 } // Add Social Housing Choropleth style
   });
@@ -75,7 +78,7 @@ function App() {
   const [transportLayers, setTransportLayers] = useState(['mrtStations', 'busStops', 'mrtLines']);
   const [blueGreenLayers, setBlueGreenLayers] = useState(['trees', 'ecoProtection']);
   const [socialHousingLayers, setSocialHousingLayers] = useState(['socialHousing', 'socialHousingChoropleth']); // New Group
-  const [infrastructureLayers, setInfrastructureLayers] = useState(['sidewalksMarked', 'sidewalksPhysical', 'roads']);
+  const [infrastructureLayers, setInfrastructureLayers] = useState(['sidewalksMarked', 'sidewalksPhysical', 'roads', 'smallRoads']);
 
   const [adminLayers, setAdminLayers] = useState(['villages', 'districts', 'mainPlan']); // Removed socialHousing layers from here
 
@@ -89,7 +92,8 @@ function App() {
     busStops: { label: '公車站 (Bus Stops)', type: 'point' },
     trees: { label: '行道樹 (Trees)', type: 'point' },
     ecoProtection: { label: '生態保護區 (Eco Protection)', type: 'polygon' },
-    roads: { label: '道路 (Roads)', type: 'polygon' },
+    roads: { label: '主要道路 (Main Roads)', type: 'polygon' },
+    smallRoads: { label: '巷弄/細部路網 (Small Roads <8m)', type: 'line' }, // Add Small Roads config
     sidewalksMarked: { label: '標線型人行道 (Marked Sidewalks)', type: 'polygon' },
     sidewalksPhysical: { label: '實體人行道 (Physical Sidewalks)', type: 'polygon' },
     grid: { label: '步行分數網格 (Walkability Grid)', type: 'polygon', noColor: true },
@@ -370,7 +374,7 @@ function App() {
     roads: roadsData,
     sidewalksMarked: sidewalksMarkedData,
     sidewalksPhysical: sidewalksPhysicalData,
-    sidewalksPhysical: sidewalksPhysicalData,
+    smallRoads: smallRoadsData, // Add small roads data
     socialHousing: socialHousingData, // Add social housing data
     socialHousingChoroplethData: socialHousingChoroplethData // Pass aggregated data
   }), [socialHousingData, socialHousingChoroplethData]);

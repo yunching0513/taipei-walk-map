@@ -201,6 +201,22 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
                 });
             }
 
+            // --- 2b. Small Roads (Line) ---
+            if (layers.smallRoads && !map.current.getSource('small-roads')) {
+                map.current.addSource('small-roads', { type: 'geojson', data: layers.smallRoads });
+                map.current.addLayer({
+                    id: 'small-roads-line',
+                    type: 'line',
+                    source: 'small-roads',
+                    layout: { visibility: visibleLayers.smallRoads ? 'visible' : 'none' },
+                    paint: {
+                        'line-color': layerStyles.smallRoads ? layerStyles.smallRoads.color : '#95a5a6',
+                        'line-width': 1,
+                        'line-opacity': layerStyles.smallRoads ? layerStyles.smallRoads.opacity : 0.6
+                    }
+                });
+            }
+
             // --- 3a. Sidewalks Marked (標線型人行道) ---
             if (layers.sidewalksMarked && !map.current.getSource('sidewalks-marked')) {
                 map.current.addSource('sidewalks-marked', { type: 'geojson', data: layers.sidewalksMarked });
@@ -664,6 +680,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         setVisibility('bird-protection-fill', visibleLayers.ecoProtection);
         setVisibility('nature-protection-fill', visibleLayers.ecoProtection);
         setVisibility('roads-fill', visibleLayers.roads);
+        setVisibility('small-roads-line', visibleLayers.smallRoads); // Add small roads visibility
         setVisibility('sidewalks-marked-fill', visibleLayers.sidewalksMarked);
         setVisibility('sidewalks-physical-fill', visibleLayers.sidewalksPhysical);
         setVisibility('sidewalks-physical-fill', visibleLayers.sidewalksPhysical);
@@ -687,6 +704,7 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
             'ecoProtection': ['parks-fill', 'agriculture-fill', 'bird-protection-fill', 'nature-protection-fill'],
             'mrtLines': ['mrt-lines-layer'],
             'roads': ['roads-fill'],
+            'smallRoads': ['small-roads-line'], // Add small roads to mapping
             'sidewalksMarked': ['sidewalks-marked-fill'],
             'sidewalksPhysical': ['sidewalks-physical-fill'],
             'grid': ['grid-fill'],
@@ -806,6 +824,12 @@ export default function Map({ layers, visibleLayers, layerStyles, layerOrder, sc
         if (map.current.getLayer('roads-fill')) {
             map.current.setPaintProperty('roads-fill', 'fill-color', layerStyles.roads.color);
             map.current.setPaintProperty('roads-fill', 'fill-opacity', layerStyles.roads.opacity);
+        }
+
+        // Small Roads
+        if (map.current.getLayer('small-roads-line') && layerStyles.smallRoads) {
+            map.current.setPaintProperty('small-roads-line', 'line-color', layerStyles.smallRoads.color);
+            map.current.setPaintProperty('small-roads-line', 'line-opacity', layerStyles.smallRoads.opacity);
         }
 
         // Sidewalks Marked
